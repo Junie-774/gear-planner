@@ -5,9 +5,11 @@ import {StatTierDisplay} from "./stat_tier_display";
 import {CharacterGearSet} from "../gear";
 import {GearPlanSheet} from "../components";
 import {FieldBoundCheckBox, quickElement} from "./util";
+import { MeldSolverMenu } from "./materia_solver";
 
 export class GearEditToolbar extends HTMLDivElement {
     private readonly statTierDisplay: StatTierDisplay;
+    private readonly meldSolverMenu: MeldSolverMenu;
 
     constructor(sheet: GearPlanSheet,
                 itemDisplaySettings: ItemDisplaySettings,
@@ -39,10 +41,14 @@ export class GearEditToolbar extends HTMLDivElement {
 
         this.statTierDisplay = new StatTierDisplay(sheet);
         this.appendChild(this.statTierDisplay);
+
+        this.meldSolverMenu = new MeldSolverMenu(sheet);
+        this.appendChild(this.meldSolverMenu);
     }
 
     refresh(gearSet: CharacterGearSet) {
         this.statTierDisplay.refresh(gearSet);
+        this.meldSolverMenu.refresh(gearSet);
     }
 }
 
