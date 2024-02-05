@@ -68,7 +68,10 @@ export class AllSlotMateriaManager extends HTMLElement {
                 this.classList.add("materia-slot-no-slots");
                 this.classList.remove("materia-manager-equipped")
                 const textSpan = document.createElement("span");
-                if (equipSlot.gearItem.isSyncedDown) {
+                if (equipSlot.gearItem.isCustomRelic) {
+                    textSpan.textContent = "Click into cells to edit relic stats"
+                }
+                else if (equipSlot.gearItem.isSyncedDown) {
                     textSpan.textContent = "Melds unavailable due to ilvl sync";
                 }
                 else {
@@ -277,6 +280,8 @@ export class SlotMateriaManagerPopup extends HTMLElement {
         for (let stat of stats) {
             const headerCell = document.createElement("th");
             headerCell.textContent = STAT_ABBREVIATIONS[stat];
+            headerCell.classList.add('stat-' + stat);
+            headerCell.classList.add('primary');
             headerRow.appendChild(headerCell);
         }
         for (let grade of grades) {
@@ -331,11 +336,11 @@ export class MateriaPriorityPicker extends HTMLElement {
         super();
         // this.appendChild(document.createTextNode('Materia Prio Thing Here'));
         const header = document.createElement('span');
-        header.textContent = 'Materia Priority: ';
-        const cb = labeledCheckbox('Fill Newly Selected Items', new FieldBoundCheckBox(prioController, 'autoFillNewItem'));
+        header.textContent = 'Mat Prio: ';
+        const cb = labeledCheckbox('Fill When Selecting Items', new FieldBoundCheckBox(prioController, 'autoFillNewItem'));
         cb.title = 'When an item is selected, fill its materia slots according to the chosen priority.'
         const fillEmptyNow = makeActionButton('Fill Empty', () => prioController.fillEmpty(), 'Fill all empty materia slots according to the chosen priority.');
-        const fillAllNow = makeActionButton('Overwrite All', () => prioController.fillAll(), 'Empty out and re-fill all materia slots according to the chosen priority.');
+        const fillAllNow = makeActionButton('Fill All', () => prioController.fillAll(), 'Empty out and re-fill all materia slots according to the chosen priority.');
         const drag = new MateriaDragList(prioController);
 
         const minGcdText = document.createElement('span');

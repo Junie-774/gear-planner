@@ -125,7 +125,7 @@ export class WhmSheetSim extends BaseMultiCycleSim<WhmSheetSimResult, WhmNewShee
                     cycle.useOgcd(pom);
                     cycle.use(filler);
                     cycle.use(assize);
-                    if (cycle.cycleNumber > 1) {
+                    if (cycle.cycleNumber > 0) {
                         cycle.use(misery);
                     }
                     cycle.useUntil(filler, 30);
@@ -147,7 +147,7 @@ export class WhmSheetSim extends BaseMultiCycleSim<WhmSheetSimResult, WhmNewShee
                         cycle.use(lily);
                         cycle.use(lily);
                     }
-                    cycle.useUntil(filler, 120);
+                    cycle.useUntil(filler, 'end');
                 });
             }
 

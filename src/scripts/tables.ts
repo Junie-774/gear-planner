@@ -1,5 +1,10 @@
 function setCellProps(cell: HTMLTableCellElement, colDef: CustomColumn<any, any>) {
     cell.setAttribute("col-id", colDef.shortName);
+    const extraClasses = colDef.extraClasses;
+    if (extraClasses) {
+        cell.classList.add(...extraClasses);
+    }
+    cell.classList.add()
     if (colDef.initialWidth !== undefined) {
         cell.style.width = cell.style.minWidth = cell.style.maxWidth = colDef.initialWidth + "px";
     }
@@ -80,6 +85,10 @@ export class CustomTableHeaderRow<RowDataType> extends HTMLTableRowElement imple
 
     refreshSelection() {
         this._cells.forEach(cell => cell.refreshSelection());
+    }
+
+    get element(): HTMLElement {
+        return this;
     }
 }
 
@@ -217,11 +226,8 @@ export class TitleRow {
 }
 
 export class SpecialRow<RowDataType, SelectionType> {
-
-    creator: (table: CustomTable<RowDataType, SelectionType>) => Node
-
-    constructor(creator: (table: CustomTable<RowDataType, SelectionType>) => Node) {
-        this.creator = creator;
+    constructor(public readonly creator: (table: CustomTable<RowDataType, SelectionType>) => Node,
+                public readonly finisher: (row: CustomTableTitleRow, table: CustomTable<RowDataType, SelectionType>) => void = () => null) {
     }
 }
 
@@ -233,6 +239,8 @@ export interface RefreshableRow<X> {
     refreshFull(),
 
     refreshColumn(colDef: CustomColumn<X>),
+
+    get element(): HTMLElement
 }
 
 export class CustomTable<RowDataType, SelectionType = never> extends HTMLTableElement {
@@ -302,7 +310,9 @@ export class CustomTable<RowDataType, SelectionType = never> extends HTMLTableEl
                 newRowElements.push(new CustomTableTitleRow(this, item.title));
             }
             else if (item instanceof SpecialRow) {
-                newRowElements.push(new CustomTableTitleRow(this, item.creator(this)));
+                const out = new CustomTableTitleRow(this, item.creator(this));
+                item.finisher(out, this);
+                newRowElements.push(out);
             }
             else {
                 if (this.dataRowMap.has(item)) {
@@ -384,7 +394,9 @@ export class CustomTable<RowDataType, SelectionType = never> extends HTMLTableEl
     }
 
     handleClick(ev: MouseEvent) {
-        this._handleClick(ev.target);
+        if (ev.button === 0) {
+            this._handleClick(ev.target);
+        }
     }
 
     _handleClick(target) {
@@ -443,6 +455,7 @@ export interface CustomColumnSpec<RowDataType, CellDataType = string, ColumnData
     fixedWidth?: number | undefined;
     dataValue?: ColumnDataType;
     headerStyler?: (value: ColumnDataType, colHeader: CustomTableHeaderCell<RowDataType, CellDataType, ColumnDataType>) => void;
+    extraClasses?: string[]
 }
 
 export class CustomColumn<RowDataType, CellDataType = string, ColumnDataType = any> {
@@ -477,6 +490,7 @@ export class CustomColumn<RowDataType, CellDataType = string, ColumnDataType = a
     };
     condition?: () => boolean = () => true;
     initialWidth?: number | undefined = undefined;
+    extraClasses?: string[] = undefined;
     fixedWidth?: number | undefined = undefined;
     dataValue?: ColumnDataType;
     headerStyler?: (value: ColumnDataType, colHeader: CustomTableHeaderCell<RowDataType, CellDataType, ColumnDataType>) => void;
@@ -539,6 +553,10 @@ export class CustomRow<RowDataType> extends HTMLTableRowElement implements Refre
         this._selected = selected;
         this.setAttribute("is-selected", String(selected));
     }
+
+    get element(): HTMLElement {
+        return this;
+    }
 }
 
 
@@ -548,7 +566,7 @@ export class CustomCell<RowDataType, CellDataType> extends HTMLTableCellElement 
     dataItem: RowDataType;
     colDef: CustomColumn<RowDataType, CellDataType>;
     row: CustomRow<RowDataType>;
-    _value: CellDataType;
+    _cellValue: CellDataType;
     private _selected: boolean = false;
 
     constructor(dataItem: RowDataType, colDef: CustomColumn<RowDataType, CellDataType>, row: CustomRow<RowDataType>, opts?: RefreshableOpts) {
@@ -566,10 +584,10 @@ export class CustomCell<RowDataType, CellDataType> extends HTMLTableCellElement 
     refreshFull() {
         let node: Node;
         try {
-            this._value = this.colDef.getter(this.dataItem);
-            node = this.colDef.renderer(this._value, this.row.dataItem);
+            this._cellValue = this.colDef.getter(this.dataItem);
+            node = this.colDef.renderer(this._cellValue, this.row.dataItem);
             if (node) {
-                this.colDef.colStyler(this._value, this, node, this.row.dataItem);
+                this.colDef.colStyler(this._cellValue, this, node, this.row.dataItem);
             }
         } catch (e) {
             console.error(e);
@@ -598,8 +616,8 @@ export class CustomCell<RowDataType, CellDataType> extends HTMLTableCellElement 
         this.selected = (this.row.table.selectionModel.isCellSelectedDirectly(this));
     }
 
-    get value() {
-        return this._value;
+    get cellValue() {
+        return this._cellValue;
     }
 
     set selected(selected) {

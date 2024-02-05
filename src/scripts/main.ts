@@ -6,11 +6,15 @@ import {getBisSheet} from "./external/static_bis";
 import {JobName} from "./xivconstants";
 import {LoadingBlocker} from "./components/loader";
 import {earlyEmbedInit, openEmbed} from "./embed";
+import {SETTINGS} from "./persistent_settings";
 
 export const SHORTLINK_HASH = 'sl';
+export const SHARE_LINK = 'https://share.xivgear.app/share/';
 export const BIS_HASH = 'bis';
 
 export const VIEW_SHEET_HASH = 'viewsheet';
+export const VIEW_SET_HASH = 'viewset';
+export const EMBED_HASH = 'embed';
 
 export const contentArea = document.getElementById("content-area");
 // export const midBarArea = document.getElementById("mid-controls-area");
@@ -31,12 +35,12 @@ function handleWelcomeArea() {
     }
     else {
         const hideWelcomeAreaSettingKey = 'hide-welcome-area';
-        if (localStorage.getItem(hideWelcomeAreaSettingKey) == 'true') {
+        if (SETTINGS.hideWelcomeMessage) {
             hideWelcomeArea();
         }
         else {
             welcomeCloseButton.addEventListener('click', () => {
-                localStorage.setItem(hideWelcomeAreaSettingKey, 'true');
+                SETTINGS.hideWelcomeMessage = true;
                 hideWelcomeArea();
             })
         }
@@ -74,6 +78,10 @@ function setMainContent(title: string, ...nodes) {
 
 let embed = false;
 
+export function getCurrentHash() {
+    return [...expectedHash];
+}
+
 async function processHash() {
     // Remove the literal #
     let hash = (location.hash.startsWith("#") ? location.hash.substring(1) : location.hash).split('/').filter(item => item).map(item => decodeURIComponent(item));
@@ -91,7 +99,7 @@ async function processHash() {
         showSheetPickerMenu();
     }
     else {
-        if (hash[0] === "embed") {
+        if (hash[0] === EMBED_HASH) {
             earlyEmbedInit();
             embed = true;
             hash = hash.slice(1);
@@ -108,21 +116,21 @@ async function processHash() {
         else if (mainNav === "newsheet") {
             showNewSheetForm();
         }
-        else if (mainNav === "importsheet" || mainNav === "viewsheet") {
+        else if (mainNav === "importsheet" || mainNav === VIEW_SHEET_HASH) {
             if (hash.length === 1) {
                 showImportSheetForm();
             }
             else {
                 const json = hash.slice(1).join('/');
                 const parsed = JSON.parse(decodeURI(json)) as SheetExport;
-                openExport(parsed, false, mainNav === "viewsheet");
+                openExport(parsed, false, mainNav === VIEW_SHEET_HASH);
             }
         }
-        else if (mainNav === "importset" || mainNav === "viewset") {
+        else if (mainNav === "importset" || mainNav === VIEW_SET_HASH) {
             if (hash.length >= 2) {
                 const json = hash.slice(1).join('/');
                 const parsed = JSON.parse(decodeURI(json)) as SetExport;
-                openExport(parsed, false, mainNav === "viewset");
+                openExport(parsed, false, mainNav === VIEW_SET_HASH);
             }
         }
         else if (mainNav === SHORTLINK_HASH) {
@@ -194,17 +202,19 @@ export function showNewSheetForm() {
 export function showImportSheetForm() {
     setHash('importsheet')
     setMainContent('Import Sheet', new ImportSheetArea(async sheet => {
-        openSheet(sheet, false);
         setHash('imported');
+        openSheet(sheet, false);
     }));
 }
 
+const pageTitle = 'XivGear - FFXIV Gear Planner';
+
 export function setTitle(titlePart: string | undefined) {
     if (titlePart === undefined) {
-        document.title = 'FFXIV Gear Planner';
+        document.title = pageTitle;
     }
     else {
-        document.title = titlePart + ' - FFXIV Gear Planner';
+        document.title = titlePart + ' - ' + pageTitle;
     }
 }
 
@@ -242,7 +252,6 @@ export async function openSheetByKey(sheet: string) {
     const planner = GearPlanSheet.fromSaved(sheet);
     if (planner) {
         await openSheet(planner);
-        setTitle(planner.sheetName);
     }
     else {
         contentArea.replaceChildren(document.createTextNode("That sheet does not exist."));
@@ -266,6 +275,10 @@ export async function openExport(exported: (SheetExport | SetExport), changeHash
     }
 }
 
+export function getHashForSaveKey(saveKey: string) {
+    return ["sheet", saveKey, "dont-copy-this-link", "use-the-export-button"];
+}
+
 export async function openSheet(planner: GearPlanSheet, changeHash: boolean = true) {
     setTitle('Loading Sheet');
     console.log('openSheet: ', planner.saveKey);
@@ -277,9 +290,13 @@ export async function openSheet(planner: GearPlanSheet, changeHash: boolean = tr
     const oldHash = getHash();
     const loadSheetPromise = planner.loadData().then(() => {
         // If the user has navigated away while the sheet was loading, do not display the sheet.
-        if (arrayEq(getHash(), oldHash)) {
+        const newHash = getHash();
+        if (arrayEq(newHash, oldHash)) {
             contentArea.replaceChildren(planner);
             setTitle(planner.sheetName);
+        }
+        else {
+            console.log("Canceled showing sheet due to hash change", oldHash, newHash);
         }
     }, (reason) => {
         console.error(reason);
@@ -300,15 +317,10 @@ let isLightMode: boolean;
 function setLightMode(lightMode: boolean | 'load') {
     const settingKey = 'light-mode';
     if (lightMode === 'load') {
-        if (localStorage.getItem(settingKey) === 'true') {
-            lightMode = true;
-        }
-        else {
-            lightMode = false;
-        }
+        lightMode = SETTINGS.lightMode ?? false;
     }
     else {
-        localStorage.setItem(settingKey, String(lightMode));
+        SETTINGS.lightMode = lightMode;
     }
     const body = document.querySelector('body');
     const lightModeClass = 'light-mode';
@@ -366,10 +378,10 @@ function earlyUiSetup() {
 // }
 
 document.addEventListener("DOMContentLoaded", () => {
-
     // iosPolyfill();
     earlyUiSetup();
     addEventListener("hashchange", processHash);
     initialLoad();
-})
+});
+
 

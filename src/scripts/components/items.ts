@@ -1,4 +1,4 @@
-import {CharacterGearSet, EquippedItem, ItemSingleStatDetail} from "../gear";
+import {CharacterGearSet, EquippedItem, ItemSingleStatDetail, nonEmptyRelicStats} from "../gear";
 import {
     DisplayGearSlot,
     EquipmentSet,
@@ -24,11 +24,21 @@ import {
     SpecialRow,
     TitleRow
 } from "../tables";
-import {MateriaSubstat, MateriaSubstats, STAT_ABBREVIATIONS} from "../xivconstants";
+import {formatAcquisitionSource, MateriaSubstat, MateriaSubstats, STAT_ABBREVIATIONS} from "../xivconstants";
 import {FieldBoundCheckBox, FieldBoundIntField, labeledCheckbox} from "./util";
 import {AllSlotMateriaManager} from "./materia";
 import {GearPlanSheet} from "../components";
-import Spec = Mocha.reporters.Spec;
+import {shortenItemName} from "../util/strutils";
+
+function statCellStylerRemover(cell: CustomCell<GearSlotItem, any>) {
+    cell.classList.remove("secondary");
+    cell.classList.remove("primary");
+    cell.classList.remove("stat-melded-overcapped");
+    cell.classList.remove("stat-melded-overcapped-major");
+    cell.classList.remove("stat-melded");
+    cell.classList.remove("stat-synced-down");
+    cell.classList.remove("stat-cell");
+}
 
 /**
  * Helper to add classes to cells for stats on a gear item.
@@ -40,14 +50,43 @@ import Spec = Mocha.reporters.Spec;
  */
 function statCellStyler(cell: CustomCell<GearSlotItem, any>, value: number | ItemSingleStatDetail, stat: keyof RawStats) {
 
-    cell.classList.add("stat-" + stat);
-    if (cell.dataItem.item.primarySubstat === stat) {
+    let isPrimary: boolean = false;
+    let isSecondary: boolean = false;
+    cell.classList.add("stat-cell", "stat-" + stat);
+    if (cell.dataItem.item.isCustomRelic) {
+        const current = (value instanceof Object) ? value.fullAmount : value;
+        const cap = cell.dataItem.item.statCaps[stat];
+        if (cap) {
+            if (current >= cap) {
+                isPrimary = true;
+            }
+            else if (current > 0) {
+                isSecondary = true;
+            }
+        }
+    }
+    else {
+        if (cell.dataItem.item.primarySubstat === stat) {
+            isPrimary = true;
+        }
+        else if (cell.dataItem.item.secondarySubstat === stat) {
+            isSecondary = true;
+        }
+    }
+    if (isPrimary) {
         cell.classList.add("primary");
+        cell.classList.remove("secondary");
     }
-    else if (cell.dataItem.item.secondarySubstat === stat) {
+    else if (isSecondary) {
         cell.classList.add("secondary");
+        cell.classList.remove("primary");
     }
-    if (cell._value === 0) {
+    else {
+        cell.classList.remove("secondary");
+        cell.classList.remove("primary");
+    }
+
+    if (cell._cellValue === 0) {
         cell.classList.add("stat-zero");
     }
     else {
@@ -92,6 +131,7 @@ function statCellStyler(cell: CustomCell<GearSlotItem, any>, value: number | Ite
  */
 function foodStatCellStyler(cell: CustomCell<FoodItem, any>, stat: keyof RawStats) {
 
+    cell.classList.add("food-stat-cell");
     cell.classList.add("stat-" + stat);
     if (cell.dataItem.primarySubStat === stat) {
         cell.classList.add("primary");
@@ -99,7 +139,7 @@ function foodStatCellStyler(cell: CustomCell<FoodItem, any>, stat: keyof RawStat
     else if (cell.dataItem.secondarySubStat === stat) {
         cell.classList.add("secondary");
     }
-    if (cell._value === 0) {
+    if (cell._cellValue === 0) {
         cell.classList.add("stat-zero");
     }
 }
@@ -116,7 +156,7 @@ class FoodStatBonus extends HTMLElement {
         super();
         this.appendChild(makeSpan(`+${value.percentage}%`))
         this.appendChild(document.createTextNode(' '));
-        this.appendChild(makeSpan(`<${value.max}`, ['food-stat-narrow']));
+        this.appendChild(makeSpan(`≤${value.max}`, ['food-stat-narrow']));
         this.appendChild(makeSpan(`(max ${value.max})`, ['food-stat-wide']));
     }
 }
@@ -165,6 +205,7 @@ export class FoodItemsTable extends CustomTable<FoodItem, FoodItem> {
     constructor(sheet: GearPlanSheet, gearSet: CharacterGearSet) {
         super();
         this.classList.add("food-items-table");
+        this.classList.add("hoverable")
         super.columns = [
             {
                 shortName: "ilvl",
@@ -248,7 +289,7 @@ export class FoodItemViewTable extends CustomTable<FoodItem, FoodItem> {
         super.columns = [
             {
                 shortName: "ilvl",
-                displayName: "iLvl",
+                displayName: "",
                 getter: item => item.ilvl,
             },
             {
@@ -266,7 +307,7 @@ export class FoodItemViewTable extends CustomTable<FoodItem, FoodItem> {
             },
             {
                 shortName: "itemname",
-                displayName: "Name",
+                displayName: "Food",
                 getter: item => {
                     return item.name;
                 },
@@ -299,20 +340,28 @@ function itemTableStatColumn(sheet: GearPlanSheet, set: CharacterGearSet, stat: 
         shortName: stat,
         displayName: STAT_ABBREVIATIONS[stat],
         getter: slotItem => {
-            if (slotItem.item.isCustomRelic
-                && slotItem.item.stats[stat] === 0
+            const item = slotItem.item;
+            if (item.isCustomRelic
+                && item.stats[stat] === 0
                 && MateriaSubstats.includes(stat as MateriaSubstat)) {
-                return new RelicCellInfo(set, slotItem.item, slotItem.slotId, stat as Substat);
+                const currentEquipment: EquippedItem = set.equipment[slotItem.slotId];
+                if (currentEquipment && currentEquipment.gearItem !== item) {
+                    const preview = set.toEquippedItem(item);
+                    if (nonEmptyRelicStats(preview.relicStats)) {
+                        return set.getEquipStatDetail(preview, stat);
+                    }
+                }
+                return new RelicCellInfo(set, item, slotItem.slotId, stat as Substat);
             }
             else {
-                const selected = set.getItemInSlot(slotItem.slotId) === slotItem.item;
+                const selected = set.getItemInSlot(slotItem.slotId) === item;
                 if (selected) {
                     return set.getStatDetail(slotItem.slotId, stat);
                 }
                 else {
-                    if (slotItem.item.isSyncedDown) {
-                        const unsynced = slotItem.item.unsyncedVersion.stats[stat];
-                        const synced = slotItem.item.stats[stat];
+                    if (item.isSyncedDown) {
+                        const unsynced = item.unsyncedVersion.stats[stat];
+                        const synced = item.stats[stat];
                         if (synced < unsynced) {
                             return {
                                 effectiveAmount: synced,
@@ -327,7 +376,7 @@ function itemTableStatColumn(sheet: GearPlanSheet, set: CharacterGearSet, stat: 
                         }
                     }
                     else {
-                        return slotItem.item.stats[stat];
+                        return item.stats[stat];
                     }
                 }
             }
@@ -395,13 +444,22 @@ function itemTableStatColumn(sheet: GearPlanSheet, set: CharacterGearSet, stat: 
         condition:
             () => sheet.isStatRelevant(stat),
         colStyler:
-            (value, cell, node) => highlightPrimarySecondary && !(value instanceof RelicCellInfo) ? statCellStyler(cell, value, stat) : undefined,
+            (value, cell, node) => {
+                if (highlightPrimarySecondary) {
+                    if (value instanceof RelicCellInfo) {
+                        statCellStylerRemover(cell);
+                    }
+                    else {
+                        statCellStyler(cell, value, stat)
+                    }
+                }
+            },
     }
 }
 
 /**
  * Table for displaying gear options for all slots
- */
+ aa*/
 export class GearItemsTable extends CustomTable<GearSlotItem, EquipmentSet> {
     private readonly materiaManagers: AllSlotMateriaManager[];
     private selectionTracker: Map<keyof EquipmentSet, CustomRow<GearSlotItem> | GearSlotItem>;
@@ -410,6 +468,7 @@ export class GearItemsTable extends CustomTable<GearSlotItem, EquipmentSet> {
         super();
         this.classList.add("gear-items-table");
         this.classList.add("gear-items-edit-table");
+        this.classList.add("hoverable");
         super.columns = [
             {
                 shortName: "ilvl",
@@ -437,8 +496,15 @@ export class GearItemsTable extends CustomTable<GearSlotItem, EquipmentSet> {
                 getter: item => {
                     return item.item.name;
                 },
+                renderer: (name: string) => {
+                    return document.createTextNode(shortenItemName(name));
+                },
                 colStyler: (value, colElement, internalElement, rowValue) => {
                     colElement.title = `${value} (${rowValue.item.id})`;
+                    const formattedAcqSrc = formatAcquisitionSource(rowValue.item.acquisitionType);
+                    if (formattedAcqSrc) {
+                        colElement.title += `\nAcquired from: ${formattedAcqSrc}`;
+                    }
                 }
             },
             {
@@ -507,6 +573,7 @@ export class GearItemsTable extends CustomTable<GearSlotItem, EquipmentSet> {
             const slotId = name as keyof EquipmentSet;
             if (slotId === 'Weapon') {
                 data.push(new SpecialRow(table => {
+                    // Weapons have the option to display relics that violate the ilvl range
                     const div = document.createElement('div');
                     div.classList.add('weapon-ilvl-bypass-setting');
                     const text = document.createElement('span');
@@ -521,7 +588,17 @@ export class GearItemsTable extends CustomTable<GearSlotItem, EquipmentSet> {
             else {
                 data.push(new TitleRow(slot.name));
             }
-            const itemsInSlot = itemMapping.get(slot.gearSlot);
+            let itemsInSlot = itemMapping.get(slot.gearSlot);
+            if (itemsInSlot === undefined) {
+                itemsInSlot = [];
+            }
+            // Also display selected item
+            const selection = gearSet.getItemInSlot(slotId);
+            if (selection) {
+                if (!itemsInSlot.includes(selection)) {
+                    itemsInSlot.push(selection);
+                }
+            }
             if (itemsInSlot && itemsInSlot.length > 0) {
                 const sortedItems = [...itemsInSlot];
                 sortedItems.sort((left, right) => left.ilvl - right.ilvl);
@@ -616,6 +693,38 @@ export class GearItemsViewTable extends CustomTable<GearSlotItem, EquipmentSet> 
         super();
         this.classList.add("gear-items-table");
         this.classList.add("gear-items-view-table");
+        let headingText = handledSlots && handledSlots.length > 0 ? EquipSlotInfo[handledSlots[0]].name : "Name";
+        const data: (TitleRow | HeaderRow | GearSlotItem)[] = [];
+        // Track the selected item in every category so that it can be more quickly refreshed
+        data.push(new HeaderRow());
+        let slotItem: GearItem = null;
+        for (const [name, slot] of Object.entries(EquipSlotInfo)) {
+            if (handledSlots && !handledSlots.includes(name as EquipSlotKey)) {
+                continue;
+            }
+            const slotId = name as keyof EquipmentSet;
+            const equippedItem = itemMapping.get(slot.slot);
+            if (equippedItem) {
+                const item = {
+                    slot: slot,
+                    item: equippedItem,
+                    slotId: slotId
+                };
+                slotItem = equippedItem;
+                data.push(item);
+                if (!equippedItem.isCustomRelic) {
+                    // TODO: make this readonly properly
+                    const matMgr = new AllSlotMateriaManager(sheet, gearSet, slotId);
+                    data.push(new SpecialRow(tbl => matMgr));
+                }
+            }
+        }
+        if (slotItem) {
+            const acqSource = formatAcquisitionSource(slotItem.acquisitionType);
+            if (acqSource) {
+                headingText = `${headingText}: ${acqSource}`;
+            }
+        }
         super.columns = [
             {
                 shortName: "ilvl",
@@ -639,9 +748,12 @@ export class GearItemsViewTable extends CustomTable<GearSlotItem, EquipmentSet> 
             },
             {
                 shortName: "itemname",
-                displayName: handledSlots && handledSlots.length > 0 ? EquipSlotInfo[handledSlots[0]].name : "Name",
+                displayName: headingText,
                 getter: item => {
                     return item.item.name;
+                },
+                renderer: (name: string) => {
+                    return document.createTextNode(shortenItemName(name));
                 },
                 // initialWidth: 300,
             },
@@ -684,29 +796,6 @@ export class GearItemsViewTable extends CustomTable<GearSlotItem, EquipmentSet> 
             itemTableStatColumn(sheet, gearSet, 'piety', true),
             itemTableStatColumn(sheet, gearSet, 'tenacity', true),
         ]
-        const data: (TitleRow | HeaderRow | GearSlotItem)[] = [];
-        // Track the selected item in every category so that it can be more quickly refreshed
-        data.push(new HeaderRow());
-        for (const [name, slot] of Object.entries(EquipSlotInfo)) {
-            if (handledSlots && !handledSlots.includes(name as EquipSlotKey)) {
-                continue;
-            }
-            const slotId = name as keyof EquipmentSet;
-            const equippedItem = itemMapping.get(slot.slot);
-            if (equippedItem) {
-                const item = {
-                    slot: slot,
-                    item: equippedItem,
-                    slotId: slotId
-                };
-                data.push(item);
-                if (!equippedItem.isCustomRelic) {
-                    // TODO: make this readonly properly
-                    const matMgr = new AllSlotMateriaManager(sheet, gearSet, slotId);
-                    data.push(new SpecialRow(tbl => matMgr));
-                }
-            }
-        }
         this.selectionModel = noopSelectionModel;
         this.data = data;
     }

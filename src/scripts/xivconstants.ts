@@ -1,4 +1,12 @@
-import {JobDataConst, JobTrait, LevelItemInfo, LevelStats, RawStatKey, RawStats} from "./geartypes";
+import {
+    GearAcquisitionSource,
+    JobDataConst,
+    JobTrait,
+    LevelItemInfo,
+    LevelStats,
+    RawStatKey,
+    RawStats
+} from "./geartypes";
 
 /**
  * Maximum number of materia slots on any item.
@@ -7,7 +15,7 @@ export const MATERIA_SLOTS_MAX = 5;
 /**
  * Minimum level of materia that we would ever consider relevant.
  */
-export const MATERIA_LEVEL_MIN_RELEVANT = 7;
+export const MATERIA_LEVEL_MIN_RELEVANT = 5;
 /**
  * Max supported materia level.
  */
@@ -72,7 +80,7 @@ export type RaceName = 'Duskwight' | 'Wildwood'
 /**
  * Supported levels.
  */
-export const SupportedLevels = [80, 90] as const;
+export const SupportedLevels = [70, 80, 90] as const;
 export type SupportedLevel = typeof SupportedLevels[number];
 
 // TODO: block modifications to this
@@ -107,11 +115,6 @@ const STANDARD_TANK: JobDataConst = {
     mainStat: 'strength',
     autoAttackStat: 'strength',
     irrelevantSubstats: ['spellspeed', 'piety'],
-    traits: [{
-        apply(stats) {
-            return stats.vitality += 29;
-        }
-    }] as JobTrait[],
     aaPotency: MELEE_AUTO_POTENCY
 } as const;
 
@@ -318,17 +321,35 @@ export const RACE_STATS: Record<RaceName, RawStats> = {
  * Level-specific stat modifiers
  */
 export const LEVEL_STATS: Record<SupportedLevel, LevelStats> = {
+    70: {
+        level: 70,
+        baseMainStat: 292,
+        baseSubStat: 364,
+        levelDiv: 900,
+        hp: 1700,
+        hpScalar: {
+            Tank: 18.8,
+            other: 14,
+        },
+        mainStatPowerMod: {
+            Tank: 105,
+            other: 125,
+        },
+    },
     80: {
         level: 80,
         baseMainStat: 340,
         baseSubStat: 380,
         levelDiv: 1300,
-        // TODO: this value is a guess
-        hp: 2500,
+        hp: 2000,
+        hpScalar: {
+            Tank: 26.6,
+            other: 18.8,
+        },
         mainStatPowerMod: {
             Tank: 115,
             other: 165,
-        }
+        },
     },
     90: {
         level: 90,
@@ -336,6 +357,10 @@ export const LEVEL_STATS: Record<SupportedLevel, LevelStats> = {
         baseSubStat: 400,
         levelDiv: 1900,
         hp: 3000,
+        hpScalar: {
+            Tank: 34.6,
+            other: 24.3,
+        },
         mainStatPowerMod: {
             Tank: 156,
             other: 195,
@@ -347,26 +372,44 @@ export const LEVEL_STATS: Record<SupportedLevel, LevelStats> = {
  * Numbers governing the minimum/maximum item levels to request from xivapi, as well as default display settings.
  */
 export const LEVEL_ITEMS: Record<SupportedLevel, LevelItemInfo> = {
+    70: {
+        minILvl: 290,
+        maxILvl: 999,
+        defaultIlvlSync: 405,
+        minILvlFood: 250,
+        // No reason to cap food - it isn't level-bound.
+        // You can use 90 food at 70.
+        maxILvlFood: 999,
+        minMateria: 5,
+        maxMateria: 6,
+        defaultDisplaySettings: {
+            minILvl: 380,
+            maxILvl: 405,
+            minILvlFood:  640,
+            maxILvlFood:  999,
+            higherRelics: true
+        }
+    },
     80: {
-        minILvl: 380,
-        maxILvl: 475,
-        // TODO check food levels
+        minILvl: 430,
+        maxILvl: 999,
+        defaultIlvlSync: 535,
         minILvlFood: 380,
-        maxILvlFood: 475,
+        maxILvlFood: 999,
         minMateria: 7,
         maxMateria: 8,
         defaultDisplaySettings: {
             minILvl: 450,
             maxILvl: 475,
-            minILvlFood: 440,
-            maxILvlFood: 475,
+            minILvlFood: 640,
+            maxILvlFood: 999,
             higherRelics: true
         }
     },
     90: {
+        // Would expect 570, but it has those 560 scaling artifacts
         minILvl: 560,
         maxILvl: 999,
-        // TODO check food levels
         minILvlFood: 570,
         maxILvlFood: 999,
         minMateria: 7,
@@ -398,12 +441,12 @@ export const LEVEL_ITEMS: Record<SupportedLevel, LevelItemInfo> = {
 /**
  * Main stats in current version of the game.
  */
-export const MAIN_STATS = ['strength', 'dexterity', 'intelligence', 'mind'] as const;
-// TODO: is Tenacity treated like this?
+export const MAIN_STATS = ['strength', 'dexterity', 'intelligence', 'mind', 'vitality'] as const;
+// TODO: It's hacky to declare hp like this, but oh well.
 /**
  * Substats that are treated as main stats for stat calc purposes.
  */
-export const FAKE_MAIN_STATS = ['vitality', 'determination', 'piety'] as const;
+export const FAKE_MAIN_STATS = ['determination', 'piety'] as const;
 /**
  * Substats that get the substat-specific math treatment.
  */
@@ -547,4 +590,38 @@ export function getRaceStats(race: RaceName | undefined) {
     else {
         return EMPTY_STATS;
     }
+}
+
+export const ARTIFACT_ITEM_LEVELS = [
+    290,
+    430,
+    560,
+]
+
+export const BASIC_TOME_GEAR_ILVLS = [
+    310,
+    440,
+    570
+]
+
+export const RAID_TIER_ILVLS = [
+    340, 370, 400,
+    470, 500, 530,
+    600, 630, 660
+] as const as readonly number[];
+
+export function formatAcquisitionSource(source: GearAcquisitionSource): string | null {
+    switch (source) {
+        case "augtome":
+            return "Aug. Tome";
+        case "augcrafted":
+            return "Aug. Crafted";
+        case "normraid":
+            return "Normal Raid";
+        case "extrial":
+            return "Extreme Trial";
+        case "other":
+            return null;
+    }
+    return source[0].toUpperCase() + source.substring(1);
 }

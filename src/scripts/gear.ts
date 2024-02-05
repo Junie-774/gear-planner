@@ -1,5 +1,5 @@
 import {
-    ALL_SUB_STATS,
+    ALL_SUB_STATS, ARTIFACT_ITEM_LEVELS, BASIC_TOME_GEAR_ILVLS,
     EMPTY_STATS,
     FAKE_MAIN_STATS,
     getLevelStats,
@@ -14,6 +14,7 @@ import {
     MateriaSubstat,
     NORMAL_GCD,
     RaceName,
+    RAID_TIER_ILVLS,
     SPECIAL_SUB_STATS,
     statById,
 } from "./xivconstants";
@@ -31,7 +32,7 @@ import {
     sksToGcd,
     spsTickMulti,
     spsToGcd,
-    tenacityDmg,
+    tenacityDmg, vitToHp,
     wdMulti
 } from "./xivmath";
 import {
@@ -43,12 +44,14 @@ import {
     EquipSlotKey,
     EquipSlots,
     FoodItem,
+    GearAcquisitionSource,
     GearItem,
     Materia,
     MateriaAutoFillController,
     MateriaAutoFillPrio,
     MateriaSlot,
     MeldableMateriaSlot,
+    NO_SYNC_STATS,
     OccGearSlotKey,
     RawStatKey,
     RawStats,
@@ -63,13 +66,51 @@ import {XivApiStat, xivApiStatMapping} from "./external/xivapitypes";
 import {Inactivitytimer} from "./util/inactivitytimer";
 
 
+export type RelicStats = {
+    [K in Substat]?: number
+}
+
+export function nonEmptyRelicStats(stats: RelicStats | undefined): boolean {
+    return (stats && !Object.values(stats).every(val => !val));
+}
+
+export class RelicStatMemory {
+    private readonly memory: Map<number, RelicStats> = new Map();
+
+    get(item: GearItem): RelicStats | undefined {
+        const stats = this.memory.get(item.id);
+        if (nonEmptyRelicStats(stats)) {
+            return stats;
+        }
+        else {
+            return undefined;
+        }
+    }
+
+    set(item: GearItem, stats: RelicStats) {
+        if (nonEmptyRelicStats(stats)) {
+            this.memory.set(item.id, stats);
+        }
+    }
+
+    export(): RelicStatMemoryExport {
+        return Object.fromEntries(this.memory);
+    }
+
+    import(relicStatMemory: RelicStatMemoryExport) {
+        Object.entries(relicStatMemory).every(([rawKey, stats]) => this.memory.set(parseInt(rawKey), stats));
+    }
+}
+
+export type RelicStatMemoryExport = {
+    [p: number]: RelicStats;
+};
+
 export class EquippedItem {
 
     gearItem: GearItem;
     melds: MeldableMateriaSlot[];
-    relicStats?: {
-        [K in Substat]?: number
-    };
+    relicStats?: RelicStats;
 
     constructor(gearItem: GearItem, melds: MeldableMateriaSlot[] | undefined = undefined) {
         this.gearItem = gearItem;
@@ -119,6 +160,7 @@ export class CharacterGearSet {
     private readonly refresher = new Inactivitytimer(0, () => {
         this._notifyListeners();
     });
+    readonly relicStatMemory: RelicStatMemory = new RelicStatMemory();
 
     constructor(sheet: GearPlanSheet) {
         this._sheet = sheet;
@@ -154,6 +196,10 @@ export class CharacterGearSet {
         return this._food;
     }
 
+    get sheet(): GearPlanSheet {
+        return this._sheet;
+    }
+
     private invalidate() {
         this._dirtyComp = true;
         this._updateKey++;
@@ -171,13 +217,28 @@ export class CharacterGearSet {
         if (this.equipment[slot]?.gearItem === item) {
             return;
         }
+        const old = this.equipment[slot];
+        if (old && old.relicStats) {
+            this.relicStatMemory.set(old.gearItem, old.relicStats);
+        }
         this.invalidate();
-        this.equipment[slot] = new EquippedItem(item);
+        this.equipment[slot] = this.toEquippedItem(item);
         console.log(`Set ${this.name}: slot ${slot} => ${item.name}`);
         if (materiaAutoFill && materiaAutoFill.autoFillNewItem) {
             this.fillMateria(materiaAutoFill.prio, false, [slot]);
         }
         this.notifyListeners()
+    }
+
+    toEquippedItem(item: GearItem) {
+        const equipped = new EquippedItem(item);
+        if (item.isCustomRelic) {
+            const oldStats = this.relicStatMemory.get(item);
+            if (oldStats) {
+                equipped.relicStats = oldStats;
+            }
+        }
+        return equipped;
     }
 
     private notifyListeners() {
@@ -269,15 +330,19 @@ export class CharacterGearSet {
         }
         const mainStat = Math.floor(combinedStats[classJobStats.mainStat] * (1 + 0.01 * this._sheet.partyBonus));
         const aaStat = Math.floor(combinedStats[classJobStats.autoAttackStat] * (1 + 0.01 * this._sheet.partyBonus));
+        const vitEffective = Math.floor(combinedStats.vitality * (1 + 0.01 * this._sheet.partyBonus));
         const wdEffective = Math.max(combinedStats.wdMag, combinedStats.wdPhys);
+        const hp = combinedStats.hp + vitToHp(levelStats, classJobStats, vitEffective);
         const computedStats = {
             ...combinedStats,
+            vitality: vitEffective,
             level: level,
             levelStats: levelStats,
             job: classJob,
             jobStats: classJobStats,
             gcdPhys: (base, haste = 0) => sksToGcd(base, levelStats, combinedStats.skillspeed, haste),
             gcdMag: (base, haste = 0) => spsToGcd(base, levelStats, combinedStats.spellspeed, haste),
+            hp: hp,
             critChance: critChance(levelStats, combinedStats.crit),
             critMulti: critDmg(levelStats, combinedStats.crit),
             dhitChance: dhitChance(levelStats, combinedStats.dhit),
@@ -342,23 +407,14 @@ export class CharacterGearSet {
             return EMPTY_STATS;
         }
         const itemStats = new RawStats(equip.gearItem.stats);
-        if (equip.relicStats) {
-            let relicStats = new RawStats(equip.relicStats);
-            if (equip.gearItem.isSyncedDown) {
-                relicStats = applyStatCaps(relicStats, equip.gearItem.statCaps);
-            }
-            addStats(itemStats, relicStats);
-        }
         // Note for future: if we ever get an item that has both custom stats AND materia, this logic will need to be extended.
-        else {
-            for (let stat of ALL_SUB_STATS) {
-                const statDetail = this.getStatDetail(slotId, stat);
-                if (statDetail instanceof Object) {
-                    itemStats[stat] = statDetail.effectiveAmount;
-                }
-                else {
-                    itemStats[stat] = statDetail;
-                }
+        for (let stat of ALL_SUB_STATS) {
+            const statDetail = this.getStatDetail(slotId, stat);
+            if (statDetail instanceof Object) {
+                itemStats[stat] = statDetail.effectiveAmount;
+            }
+            else {
+                itemStats[stat] = statDetail;
             }
         }
         return itemStats;
@@ -367,28 +423,55 @@ export class CharacterGearSet {
     getStatDetail(slotId: keyof EquipmentSet, stat: RawStatKey, materiaOverride?: Materia[]): ItemSingleStatDetail | number {
         // TODO: work this into the normal stat computation method
         const equip = this.equipment[slotId];
+        return this.getEquipStatDetail(equip, stat, materiaOverride);
+    }
+
+    getEquipStatDetail(equip: EquippedItem, stat: RawStatKey, materiaOverride?: Materia[]): ItemSingleStatDetail | number {
         const gearItem = equip.gearItem;
         if (!gearItem) {
             return 0;
         }
+        const stats = new RawStats(gearItem.stats);
+        if (equip.relicStats) {
+            let relicStats = new RawStats(equip.relicStats);
+            addStats(stats, relicStats);
+        }
         if (gearItem.isSyncedDown) {
-            const unsynced = gearItem.unsyncedVersion.stats[stat];
-            const synced = gearItem.stats[stat];
-            if (synced < unsynced) {
-                return {
-                    effectiveAmount: synced,
-                    fullAmount: unsynced,
-                    overcapAmount: unsynced - synced,
-                    cap: synced,
-                    mode: "synced-down"
+            if (gearItem.isCustomRelic) {
+                const cap = gearItem.statCaps[stat];
+                const current = stats[stat];
+                if (cap && current > cap) {
+                    return {
+                        effectiveAmount: cap,
+                        fullAmount: current,
+                        overcapAmount: current - cap,
+                        cap: cap,
+                        mode: "synced-down"
+                    }
+                }
+                else {
+                    return current;
                 }
             }
             else {
-                return synced;
+                const unsynced = gearItem.unsyncedVersion.stats[stat];
+                const synced = stats[stat];
+                if (synced < unsynced) {
+                    return {
+                        effectiveAmount: synced,
+                        fullAmount: unsynced,
+                        overcapAmount: unsynced - synced,
+                        cap: synced,
+                        mode: "synced-down"
+                    }
+                }
+                else {
+                    return synced;
+                }
             }
         }
         const cap = gearItem.statCaps[stat] ?? 9999;
-        const baseItemStatValue = gearItem.stats[stat];
+        const baseItemStatValue = stats[stat];
         let meldedStatValue = baseItemStatValue;
         let smallestMateria = 999999;
         const materiaList = materiaOverride === undefined ? equip.melds.map(meld => meld.equippedMateria).filter(item => item) : materiaOverride.filter(item => item);
@@ -519,6 +602,9 @@ export function applyStatCaps(stats: RawStats, statCaps: { [K in RawStatKey]?: n
         ...stats
     }
     Object.entries(stats).forEach(([stat, value]) => {
+        if (NO_SYNC_STATS.includes(stat as RawStatKey)) {
+            return;
+        }
         out[stat] = Math.min(value, statCaps[stat] ?? 999999);
     })
     return out;
@@ -566,6 +652,7 @@ export class XivApiGearInfo implements GearItem {
     isCustomRelic: boolean;
     isUnique: boolean;
     unsyncedVersion: XivApiGearInfo;
+    acquisitionType: GearAcquisitionSource;
     statCaps: {
         [K in RawStatKey]?: number
     };
@@ -701,6 +788,93 @@ export class XivApiGearInfo implements GearItem {
                     });
                 }
             }
+        }
+        try {
+            const rarity: number = data['Rarity'];
+            switch (rarity) {
+                // Green
+                case 2:
+                    if (this.name.includes('Augmented')) {
+                        this.acquisitionType = 'augcrafted';
+                    }
+                    else if (data['GameContentLinks']?.['Recipe']) {
+                        this.acquisitionType = 'crafted';
+                    }
+                    else {
+                        this.acquisitionType = 'dungeon';
+                    }
+                    break;
+                // Blue
+                case 3:
+                    // TODO: how to differentiate raid vs tome vs aug tome?
+                    // Aug tome: it has "augmented" in the name, easy
+                    const isWeaponOrOH = this.occGearSlotName === 'Weapon2H' || this.occGearSlotName === 'Weapon1H' || this.occGearSlotName === 'OffHand';
+                    if (ARTIFACT_ITEM_LEVELS.includes(this.ilvl)) {
+                        // Ambiguous due to start-of-expac ex trials
+                        if (isWeaponOrOH) {
+                            this.acquisitionType = 'other';
+                        }
+                        else {
+                            this.acquisitionType = 'artifact';
+                        }
+                    }
+                    // Start-of-expac uncapped tome gear
+                    else if (BASIC_TOME_GEAR_ILVLS.includes(this.ilvl)) {
+                        this.acquisitionType = 'tome';
+                    }
+                    const chkRelIlvl = (relativeToRaidTier: number) => {
+                        return RAID_TIER_ILVLS.includes(this.ilvl - relativeToRaidTier);
+                    };
+                    if (chkRelIlvl(0)) {
+                        if (this.name.includes('Augmented')) {
+                            this.acquisitionType = 'augtome';
+                        }
+                        else {
+                            this.acquisitionType = 'raid';
+                        }
+                    }
+                    else if (chkRelIlvl(-10)) {
+                        this.acquisitionType = 'tome';
+                    }
+                    else if (chkRelIlvl(-20)) {
+
+                        if (isWeaponOrOH) {
+                            this.acquisitionType = 'extrial';
+                        }
+                        else {
+                            // Ambiguous - first-of-the-expac extreme trial accessories and normal raid
+                            // accessories share the same ilvl
+                            this.acquisitionType = 'other';
+                        }
+                    }
+                    else if ((chkRelIlvl(-5) || chkRelIlvl(-15)) && isWeaponOrOH) {
+                        this.acquisitionType = 'extrial';
+                    }
+                    else if (this.ilvl % 10 === 5) {
+                        if (isWeaponOrOH) {
+                            if (chkRelIlvl(5)) {
+                                if (this.name.includes('Ultimate')) {
+                                    this.acquisitionType = 'ultimate';
+                                }
+                                else {
+                                    this.acquisitionType = 'raid';
+                                }
+                            }
+                        }
+                    }
+                    break;
+                // Purple
+                case 4:
+                    this.acquisitionType = 'relic';
+                    break;
+            }
+        }
+        catch (e) {
+            console.error("Error determining item rarity", data);
+        }
+        if (!this.acquisitionType) {
+            console.warn(`Unable to determine acquisition source for item ${this.name} (${this.id})`, data);
+            this.acquisitionType = 'other';
         }
     }
 

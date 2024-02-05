@@ -140,6 +140,9 @@ export class DataManager {
                 'BaseParamValueSpecial3',
                 'BaseParamValueSpecial4',
                 'BaseParamValueSpecial5',
+                // Helps determine acquisition type
+                'Rarity',
+                'GameContentLinks'
             ] as const,
             // EquipSlotCategory! => EquipSlotCategory is not null => filters out now-useless belts
             filters: [`LevelItem>=${this.minIlvl}`, `LevelItem<=${this.maxIlvl}`, `ClassJobCategory.${this.classJob}=1`, 'EquipSlotCategory!'],
@@ -155,7 +158,9 @@ export class DataManager {
                     return null;
                 }
             }).then((rawItems) => {
-                this.allItems = rawItems.map(i => new XivApiGearInfo(i));
+                this.allItems = rawItems
+                    .filter(i => i['Stats'] !== null)
+                    .map(i => new XivApiGearInfo(i));
                 // TODO: put up better error
             }, (e) => console.error(e));
         const statsPromise = Promise.all([itemsPromise, baseParamPromise]).then(() => {
@@ -229,7 +234,7 @@ export class DataManager {
         const jobsPromise = xivApiGet({
             requestType: "list",
             sheet: "ClassJob",
-            columns: ['Abbreviation', 'ModifierDexterity', 'ModifierIntelligence', 'ModifierMind', 'ModifierStrength', 'ModifierVitaliry'] as const
+            columns: ['Abbreviation', 'ModifierDexterity', 'ModifierIntelligence', 'ModifierMind', 'ModifierStrength', 'ModifierVitality', 'ModifierHitPoints'] as const
         })
             .then(data => {
                 console.log(`Got ${data.Results.length} Jobs`);
@@ -242,7 +247,9 @@ export class DataManager {
                         dexterity: rawJob.ModifierDexterity,
                         intelligence: rawJob.ModifierIntelligence,
                         mind: rawJob.ModifierMind,
-                        strength: rawJob.ModifierStrength
+                        strength: rawJob.ModifierStrength,
+                        vitality: rawJob.ModifierVitality,
+                        hp: rawJob.ModifierHitPoints,
                     })
                 }
             });

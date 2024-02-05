@@ -1,7 +1,8 @@
 import {GearPlanSheet} from "../components";
-import {closeModal, setModal} from "../modalcontrol";
+import {closeModal} from "../modalcontrol";
 import {quickElement} from "./util";
 import {CharacterGearSet} from "../gear";
+import {BaseModal} from "./modal";
 
 export function startRenameSheet(sheet: GearPlanSheet) {
     const modal = new RenameModal({
@@ -31,19 +32,16 @@ function startRename(modal: RenameModal) {
     modal.show();
 }
 
-class RenameModal extends HTMLElement {
-    private header: HTMLHeadingElement;
+class RenameModal extends BaseModal {
     private nameInput: HTMLInputElement;
     private descriptionInput: HTMLTextAreaElement;
     private applyButton: HTMLButtonElement;
     private cancelButton: HTMLButtonElement;
-    private inner: HTMLElement;
 
     constructor(private itemBeingRenamed: { name: string, description: string }) {
         super();
 
-        this.header = document.createElement('h2');
-        this.header.textContent = 'Sheet Name/Description';
+        this.headerText = 'Sheet Name/Description';
 
         this.nameInput = document.createElement('input');
         this.nameInput.type = 'text';
@@ -63,36 +61,25 @@ class RenameModal extends HTMLElement {
         this.cancelButton.textContent = 'Cancel';
         this.cancelButton.addEventListener('click', () => closeModal());
 
-        const form = quickElement('form', ['modal-inner'], [
-            this.header,
+        const form = quickElement('form', [], [
             this.nameInput,
             this.descriptionInput,
-            quickElement('div', ['button-area'], [this.applyButton, this.cancelButton])
         ]);
-        form.addEventListener('submit', () => this.apply());
+        this.contentArea.appendChild(form);
+        this.addButton(this.applyButton);
+        this.addButton(this.cancelButton);
+        form.addEventListener('submit', ev => this.apply(ev));
 
-        this.inner = quickElement('div', ['sheet-name-modal'],
-            [
-                form
-            ]);
-        this.replaceChildren(this.inner);
     }
 
-    show() {
-        const outer = this;
-        setModal({
-            element: outer.inner,
-            close() {
-                outer.remove();
-            }
-        });
-        // this.style.dis
-    }
-
-    apply() {
+    apply(ev?: SubmitEvent) {
         this.itemBeingRenamed.name = this.nameInput.value;
         this.itemBeingRenamed.description = this.descriptionInput.value;
         closeModal();
+        if (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
     }
 }
 

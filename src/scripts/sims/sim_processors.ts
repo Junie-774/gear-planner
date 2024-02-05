@@ -201,8 +201,12 @@ export class CycleContext {
         return this.mcp.use(ability);
     }
 
-    useUntil(ability: GcdAbility, useUntil: number) {
-        const correctedTime = Math.min(this.cycleStartedAt + useUntil, this.cycleStartedAt + this.cycleTime, this.mcp.totalTime);
+    useUntil(ability: GcdAbility, useUntil: number | 'end') {
+        let correctedTime: number;
+        if (useUntil == 'end') {
+            useUntil = this.cycleTime;
+        }
+        correctedTime = Math.min(this.cycleStartedAt + useUntil, this.cycleStartedAt + this.cycleTime, this.mcp.totalTime);
         this.mcp.useUntil(ability, correctedTime);
     }
 
@@ -689,7 +693,7 @@ export abstract class BaseMultiCycleSim<ResultType extends CycleSimResult, Inter
     abstract getRotationsToSimulate(): Rotation[];
 
     async simulate(set: CharacterGearSet): Promise<ResultType> {
-        console.log("Sim start");
+        console.debug("Sim start");
         const allBuffs = this.buffManager.enabledBuffs;
         const rotations = this.getRotationsToSimulate();
         const allResults = rotations.map(rot => {
@@ -705,7 +709,7 @@ export abstract class BaseMultiCycleSim<ResultType extends CycleSimResult, Inter
 
             const used = cp.finalizedRecords;
             const cycleDamage = sum(used.map(used => isFinalizedAbilityUse(used) ? used.totalDamage : 0));
-            const dps = cycleDamage / cp.nextGcdTime;
+            const dps = cycleDamage / cp.currentTime;
             const unbuffedPps = sum(used.map(used => isFinalizedAbilityUse(used) ? used.totalPotency : 0)) / cp.nextGcdTime;
             const buffTimings = [...cp.buffHistory];
 
@@ -719,7 +723,7 @@ export abstract class BaseMultiCycleSim<ResultType extends CycleSimResult, Inter
             } as unknown as ResultType;
         });
         allResults.sort((a, b) => b.mainDpsResult - a.mainDpsResult);
-        console.log("Sim end");
+        console.debug("Sim end");
         return allResults[0];
     };
 
