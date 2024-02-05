@@ -118,16 +118,40 @@ export class MeldSolver {
     }
 
 
-    h i
-    getAvailableMateria(relevantSubstats: MateriaSubstat, gearItem: GearItem): Materia[] {
-        let materia: Materia[] = [];
-        for (let slot of gearItem.materiaSlots) {
+    getAvailableMateria(relevantSubstats: MateriaSubstat, equippedItem: EquippedItem, maxGrade: number): Materia[][] {
+
+        let materia: Materia[][] = [];
+
+        let substatCap = equippedItem.gearItem.statCaps.crit;
+
+        let slotIndex = 0;
+        for (let slot of equippedItem.melds) {
+            if (slot.materiaSlot.maxGrade > maxGrade) {
+                continue;
+            }
+
+            materia.push([]);
+
             for (let stat of relevantSubstats) {
+                if (equippedItem.gearItem.stats[stat] == substatCap) {
+                    continue;
+                }
 
+                let exampleMateria = this.sheet.getBestMateria("crit", slot)
+                let statValue  = exampleMateria.primaryStatValue;
+                let numAvailableSubstat = substatCap - equippedItem.gearItem.stats[stat]
+                let numMateria = Math.floor(numAvailableSubstat / statValue);
 
+                if (numMateria > slotIndex) { // ensures that if a gearpiece can fit only up to, e.g. 1 matera of this substat, then only the first slot will have that materia available.
+                    materia[slotIndex].push(exampleMateria);
+                }
                 
             }
+
+            slotIndex++;
         }
+
+        return materia;
 
     }
 
