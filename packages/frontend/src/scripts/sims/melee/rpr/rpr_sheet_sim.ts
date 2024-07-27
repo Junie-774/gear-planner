@@ -10,6 +10,7 @@ import { AbilitiesUsedTable } from "../../components/ability_used_table";
 import { sum } from "@xivgear/core/util/array_utils";
 import { STANDARD_ANIMATION_LOCK } from "@xivgear/xivmath/xivconstants";
 import { animationLock } from "@xivgear/core/sims/ability_helpers";
+import { CycleSettings } from "@xivgear/core/sims/cycle_settings";
 
 
 export interface RprSheetSimResult extends CycleSimResult {
@@ -417,6 +418,13 @@ export class RprSheetSim extends BaseMultiCycleSim<RprSheetSimResult, RprNewShee
     shortName = "rpr-sheet-sim";
     displayName = rprSheetSpec.displayName;
     manuallyActivatedBuffs = [ArcaneCircleBuff];
+    
+    cycleSettings: CycleSettings = {
+        useAutos: true,
+        totalTime: 9*60,
+        cycles: 0,
+        which: 'totalTime'
+    }
 
     constructor(settings?: RprNewSheetSettingsExternal) {
         super('RPR', settings);

@@ -53,7 +53,7 @@ export const ArcaneCircleBuff = {
     effects: {
         dmgIncrease: 0.03
     },
-    startTime: 4.59,
+    startTime: 4.54,
     statusId: 2599
 } as const satisfies PartyBuff;
 
