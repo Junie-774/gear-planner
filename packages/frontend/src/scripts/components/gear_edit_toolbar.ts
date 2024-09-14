@@ -4,9 +4,11 @@ import {MateriaPriorityPicker} from "./materia";
 import {StatTierDisplay} from "./stat_tier_display";
 import {CharacterGearSet} from "@xivgear/core/gear";
 import {GearPlanSheet} from "@xivgear/core/sheet";
+import { MeldSolverBar } from "./meld_solver_bar";
 
 export class GearEditToolbar extends HTMLDivElement {
     private readonly statTierDisplay: StatTierDisplay;
+    private readonly meldSolverBar: MeldSolverBar;
 
     constructor(sheet: GearPlanSheet,
                 itemDisplaySettings: ItemDisplaySettings,
@@ -38,10 +40,14 @@ export class GearEditToolbar extends HTMLDivElement {
 
         this.statTierDisplay = new StatTierDisplay(sheet);
         this.appendChild(this.statTierDisplay);
+
+        this.meldSolverBar = new MeldSolverBar(sheet);
+        this.appendChild(this.meldSolverBar);
     }
 
     refresh(gearSet: CharacterGearSet) {
         this.statTierDisplay.refresh(gearSet);
+        this.meldSolverBar.refresh(gearSet);
     }
 }
 
