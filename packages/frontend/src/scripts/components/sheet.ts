@@ -31,7 +31,8 @@ import {
     EquipSlots,
     GearItem,
     MateriaAutoFillController,
-    MateriaAutoFillPrio, MateriaFillMode,
+    MateriaAutoFillPrio,
+    MateriaFillMode,
     MultiplierMitStat,
     MultiplierStat,
     PartyBonusAmount,
@@ -913,6 +914,34 @@ export class GearSetEditor extends HTMLElement {
     refresh() {
         this.checkIssues();
     }
+
+    private undoRedoHotkeyHandler = (ev: KeyboardEvent) => {
+        // ignore anything that would naturally handle an undo
+        if (ev.target instanceof Element
+            && (ev.target.tagName === 'input'
+                || ev.target.tagName === 'select'
+            )) {
+            return;
+        }
+        // Ctrl-Z = undo
+        // Ctrl-Shift-Z = redo
+        if (ev.ctrlKey && ev.key.toLowerCase() === 'z') {
+            if (ev.shiftKey) {
+                this.gearSet.redo();
+            }
+            else {
+                this.gearSet.undo();
+            }
+        }
+    };
+
+    connectedCallback() {
+        window.addEventListener('keydown', this.undoRedoHotkeyHandler);
+    }
+
+    disconnectedCallback() {
+        window.removeEventListener('keydown', this.undoRedoHotkeyHandler);
+    }
 }
 
 export class SeparatorEditor extends HTMLElement {
@@ -1220,6 +1249,7 @@ export class GearPlanSheetGui extends GearPlanSheet {
     readonly editorArea: HTMLDivElement;
     readonly midBarArea: HTMLDivElement;
     readonly toolbarHolder: HTMLDivElement;
+    toolbarNode: Node;
     // TODO: SimResult alone might not be enough since we'd want it to refresh automatically if settings are changed
     private _editorItem: CharacterGearSet | Simulation<any, any, any> | SimResultData<SimResult> | undefined;
 
@@ -1706,6 +1736,11 @@ export class GearPlanSheetGui extends GearPlanSheet {
 
     private _editorAreaNode: Node | undefined;
 
+    private setToolbarNode(node: Node | undefined) {
+        this.toolbarNode = node;
+        this.toolbarHolder.replaceChildren(node);
+    }
+
     private setupEditorArea(node: (Node & {
         toolbar?: Node
     }) | undefined = undefined) {
@@ -1714,7 +1749,7 @@ export class GearPlanSheetGui extends GearPlanSheet {
             this.editorArea.replaceChildren();
             this.editorArea.style.display = 'none';
             this.midBarArea.style.display = 'none';
-            this.toolbarHolder.replaceChildren();
+            this.setToolbarNode(undefined);
         }
         else {
             this.editorArea.replaceChildren(node);
@@ -1724,13 +1759,13 @@ export class GearPlanSheetGui extends GearPlanSheet {
             this.midBarArea.style.display = '';
             // if ('makeToolBar' in node) {
             if (node instanceof GearSetEditor) {
-                this.toolbarHolder.replaceChildren(this._gearEditToolBar);
+                this.setToolbarNode(this._gearEditToolBar);
             }
             else if ('toolbar' in node) {
-                this.toolbarHolder.replaceChildren(node.toolbar);
+                this.setToolbarNode(node.toolbar);
             }
             else {
-                this.toolbarHolder.replaceChildren();
+                this.setToolbarNode(undefined);
             }
         }
     }
@@ -1751,11 +1786,21 @@ export class GearPlanSheetGui extends GearPlanSheet {
         if (select && this._gearPlanTable) {
             this._gearPlanTable.selectGearSet(gearSet);
         }
+        gearSet.startCheckpoint(() => this.refreshGearEditor(gearSet));
+    }
+
+    refreshGearEditor(set: CharacterGearSet) {
+        if (this._editorItem === set) {
+            this.resetEditorArea();
+            // this.refreshToolbar();
+        }
     }
 
     refreshToolbar() {
         if (this._editorItem instanceof CharacterGearSet) {
-            this._gearEditToolBar?.refresh(this._editorItem);
+            if ('refresh' in this.toolbarNode && typeof this.toolbarNode.refresh === 'function') {
+                this.toolbarNode.refresh(this._editorItem);
+            }
         }
     }
 
@@ -1829,7 +1874,6 @@ export class GearPlanSheetGui extends GearPlanSheet {
         super.sheetName = name;
         setTitle(this._sheetName);
     }
-
 }
 
 export class ImportSetsModal extends BaseModal {

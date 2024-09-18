@@ -185,6 +185,7 @@ export interface GearItem extends XivCombatItem {
      */
     unsyncedVersion: GearItem;
     isSyncedDown: boolean;
+    syncedDownTo: number | null;
     isUnique: boolean;
     acquisitionType: GearAcquisitionSource;
     relicStatModel: RelicStatModel | undefined;
@@ -566,6 +567,17 @@ export class EquipmentSet {
     Wrist: EquippedItem | null;
     RingLeft: EquippedItem | null;
     RingRight: EquippedItem | null;
+
+}
+
+export function cloneEquipmentSet(set: EquipmentSet) {
+        const out = new EquipmentSet();
+        Object.entries(set).forEach(([slot, equipped]) => {
+            if (equipped instanceof EquippedItem) {
+                out[slot] = equipped.clone();
+            }
+        });
+        return out;
 }
 
 export interface MateriaSlot {
@@ -997,6 +1009,20 @@ export class EquippedItem {
         if (gearItem.isCustomRelic) {
             this.relicStats = {};
         }
+    }
+
+    clone(): EquippedItem {
+        const out = new EquippedItem(
+            this.gearItem
+        );
+        // Deep clone the materia slots
+        this.melds.forEach((slot, index) => {
+            out.melds[index].equippedMateria = slot.equippedMateria
+        });
+        if (this.relicStats !== undefined && out.relicStats !== undefined) {
+            Object.assign(out.relicStats, this.relicStats);
+        }
+        return out;
     }
 }
 
