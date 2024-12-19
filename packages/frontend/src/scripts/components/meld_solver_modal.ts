@@ -179,6 +179,8 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
     private overwriteMateriaText: HTMLSpanElement;
     private overwriteMateriaCheckbox: FieldBoundCheckBox<GearsetGenerationSettings>;
     private useTargetGcdCheckBox: FieldBoundCheckBox<GearsetGenerationSettings>;
+    private allowOneTierOvercapText: HTMLSpanElement;
+    private allowOneTierOvercap: FieldBoundCheckBox<GearsetGenerationSettings>;
     private targetGcdInput: FieldBoundFloatField<GearsetGenerationSettings>;
     private checkboxContainer: HTMLDivElement;
     private simDropdown: FieldBoundDataSelect<SolverSimulationSettings, Simulation<SimResult, unknown, unknown>>;
@@ -195,7 +197,7 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
         }
         gcd = Math.min(set.computedStats.gcdPhys(2.5, haste), set.computedStats.gcdMag(2.5, haste));
 
-        this.gearsetGenSettings = new GearsetGenerationSettings(set, false, true, gcd);
+        this.gearsetGenSettings = new GearsetGenerationSettings(set, false, true, gcd, false);
         this.simSettings = {
             sim: sheet.sims.at(0),
             sets: undefined, // Not referenced in UI
@@ -233,6 +235,10 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
         this.overwriteMateriaText = labelFor("Overwrite existing materia?", this.overwriteMateriaCheckbox);
         this.overwriteMateriaText.classList.add('meld-solver-settings');
 
+        this.allowOneTierOvercap = new FieldBoundCheckBox(this.gearsetGenSettings, 'allowOneTierOvercap');
+        this.allowOneTierOvercap.classList.add('meld-solver-settings');
+        this.allowOneTierOvercapText = labelFor("Allow some overcap?", this.allowOneTierOvercap);
+        this.allowOneTierOvercap.classList.add('meld-solver-settings');
         const simText = document.createElement('span');
         simText.textContent = "Sim: ";
         simText.classList.add('meld-solver-settings');
@@ -254,14 +260,19 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
         span2.replaceChildren(this.useTargetGcdCheckBox, targetGcdText, this.targetGcdInput);
 
         const span3 = document.createElement('li');
-        span3.replaceChildren(simText, this.simDropdown);
+        span3.replaceChildren(this.allowOneTierOvercap, this.allowOneTierOvercapText);
+
+        const span4 = document.createElement('li');
+        span4.replaceChildren(simText, this.simDropdown);
+
 
         this.checkboxContainer = document.createElement('div');
         this.checkboxContainer.classList.add('meld-solver-settings');
         this.checkboxContainer.replaceChildren(
             span1,
             span2,
-            span3
+            span3,
+            span4
         );
 
         this.useTargetGcdCheckBox.onclick = (evt) => {

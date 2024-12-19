@@ -1,6 +1,6 @@
-import {EquippedItem, RawStats, EquipmentSet, EquipSlots, MeldableMateriaSlot, SetExport} from "@xivgear/xivmath/geartypes";
+import {EquippedItem, RawStats, EquipmentSet, EquipSlots, MeldableMateriaSlot, SetExport, Substat, LevelStats} from "@xivgear/xivmath/geartypes";
 import {MateriaSubstat, ALL_SUB_STATS, NORMAL_GCD, MATERIA_ACCEPTABLE_OVERCAP_LOSS} from "@xivgear/xivmath/xivconstants";
-import {sksToGcd, spsToGcd} from "@xivgear/xivmath/xivmath";
+import {critDmg, detDmg, dhitChance, sksTickMulti, sksToGcd, spsTickMulti, spsToGcd, tenacityDmg} from "@xivgear/xivmath/xivmath";
 import {CharacterGearSet} from "../gear";
 import {GearPlanSheet} from "../sheet";
 
@@ -9,12 +9,14 @@ export class GearsetGenerationSettings {
     overwriteExistingMateria: boolean;
     useTargetGcd: boolean;
     targetGcd: number;
+    allowOneTierOvercap: boolean;
 
-    constructor(gearset: CharacterGearSet, overwrite: boolean, useTargetGcd: boolean, targetGcd: number) {
+    constructor(gearset: CharacterGearSet, overwrite: boolean, useTargetGcd: boolean, targetGcd: number, allowOnetierOvercap: boolean) {
         this.gearset = gearset;
         this.overwriteExistingMateria = overwrite;
         this.useTargetGcd = useTargetGcd;
         this.targetGcd = targetGcd;
+        this.allowOneTierOvercap = allowOnetierOvercap;
     }
 
     static export(settings: GearsetGenerationSettings, sheet: GearPlanSheet): GearsetGenerationSettingsExport {
@@ -30,6 +32,7 @@ export class GearsetGenerationSettingsExport {
     overwriteExistingMateria: boolean;
     useTargetGcd: boolean;
     targetGcd: number;
+    allowOneTierOvercap: boolean;
 }
 
 class ItemWithStats {
@@ -50,6 +53,37 @@ class EquipmentSetWithStats {
         this.set = set;
         this.stats = stats;
     }
+}
+
+const statToFnMap = new Map<Substat, (levelStats: LevelStats, number: number) => number> ([
+    ['crit', critDmg],
+    ['determination', detDmg],
+    ['dhit', dhitChance],
+    ['skillspeed', sksTickMulti],
+    ['spellspeed', spsTickMulti],
+    ['tenacity', tenacityDmg],
+]);
+
+function getSingleTiering(initialValue: number, computation: (statValue: number) => number) {
+    const initialResult = computation(initialValue);
+    for (let offset = 0; offset < 1000; offset++) {
+        const testValue = (initialValue + offset);
+        if (testValue <= 0) {
+            return offset;
+        }
+        const newResult = computation(testValue);
+        if (newResult !== initialResult) {
+            return offset;
+        }
+    }
+    throw new Error(`Tier computation error: initialValue: ${initialValue}; initialResult: ${initialResult}`);
+}
+
+function getTierSize(stat: Substat, levelStats: LevelStats) {
+    console.log("Tier size for: ", stat);
+    const base = stat === 'determination' ? levelStats.baseMainStat : levelStats.baseSubStat;
+
+    return getSingleTiering(base, (statVal) => statToFnMap.get(stat)(levelStats, statVal));
 }
 
 /**
@@ -79,6 +113,12 @@ export class GearsetGenerator {
 
         const equipment = this.cloneEquipmentset(settings.gearset.equipment);
 
+        const allowableOvercaps = new Map(
+            this.relevantStats.map(
+                (stat) => [stat, settings.allowOneTierOvercap ? getTierSize(stat, levelStats) : MATERIA_ACCEPTABLE_OVERCAP_LOSS]
+            )
+        );
+
         if (settings.overwriteExistingMateria) {
             for (const slotKey of EquipSlots) {
                 const equipSlot = equipment[slotKey] as EquippedItem | null;
@@ -97,7 +137,7 @@ export class GearsetGenerator {
         for (const slotKey of EquipSlots) {
             if (equipment[slotKey] === null || equipment[slotKey] === undefined) continue;
 
-            const pieceCombinations = this.getAllMeldCombinationsForGearItem(equipment[slotKey]);
+            const pieceCombinations = this.getAllMeldCombinationsForGearItem(equipment[slotKey], allowableOvercaps);
             allIndividualGearPieces.set(slotKey, pieceCombinations);
         }
 
@@ -171,7 +211,7 @@ export class GearsetGenerator {
         return generatedGearsets;
     }
 
-    public getAllMeldCombinationsForGearItem(equippedItem: EquippedItem): Set<ItemWithStats> | null {
+    public getAllMeldCombinationsForGearItem(equippedItem: EquippedItem, allowableStatOvercaps: Map<Substat, number>): Set<ItemWithStats> | null {
         const meldCombinations: Map<string, ItemWithStats> = new Map<string, ItemWithStats>();
 
         const basePiece = new ItemWithStats(this.cloneEquippedItem(equippedItem), this.getPieceEffectiveStats(equippedItem));
@@ -198,7 +238,7 @@ export class GearsetGenerator {
                     newStats[stat] += materia.primaryStatValue;
                     const newStatsKey = this.statsToString(newStats, this.relevantStats);
 
-                    if (stats[stat] + materia.primaryStatValue - existingCombination.item.gearItem.statCaps[stat] < MATERIA_ACCEPTABLE_OVERCAP_LOSS
+                    if (stats[stat] + materia.primaryStatValue - existingCombination.item.gearItem.statCaps[stat] < allowableStatOvercaps.get(stat)
                         && !itemsToAdd.has(newStatsKey) // Skip if this combination of stats has been found
                     ) {
                         const newMelds: MeldableMateriaSlot[] = this.cloneMelds(existingCombination.item.melds);
