@@ -3,7 +3,8 @@ import {
     FieldBoundDataSelect,
     FieldBoundFloatField,
     labeledCheckbox,
-    makeActionButton
+    makeActionButton,
+    quickElement
 } from "@xivgear/common-ui/components/util";
 import {CharacterGearSet} from "@xivgear/core/gear";
 import {GearPlanSheetGui} from "./sheet";
@@ -178,7 +179,7 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
     public simSettings: SolverSimulationSettings;
 
     private overwriteMateriaCheckbox: HTMLDivElement;
-    private useTargetGcdCheckBox: HTMLDivElement;
+    private useTargetGcdCheckbox: HTMLDivElement;
     private targetGcdInput: FieldBoundFloatField<GearsetGenerationSettings>;
 
     private checkboxContainer: HTMLDivElement;
@@ -225,7 +226,7 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
             fixDecimals: 2,
         });
 
-        this.useTargetGcdCheckBox = labeledCheckbox("Target GCD: ", new FieldBoundCheckBox(this.gearsetGenSettings, 'useTargetGcd'));
+        this.useTargetGcdCheckbox = labeledCheckbox("Target GCD: ", new FieldBoundCheckBox(this.gearsetGenSettings, 'useTargetGcd'));
         this.targetGcdInput.pattern = '\\d\\.\\d\\d?';
         this.targetGcdInput.title = 'Solve for the best set with this GCD';
         this.targetGcdInput.classList.add('meld-solver-target-gcd-input');
@@ -245,29 +246,20 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
         );
         this.simDropdown.classList.add('meld-solver-sim-dropdown');
 
-        const overwriteMateriaItem = document.createElement('li');
-        overwriteMateriaItem.replaceChildren(this.overwriteMateriaCheckbox);
-
-        const targetGcdItem = document.createElement('li');
-        targetGcdItem.replaceChildren(this.useTargetGcdCheckBox, this.targetGcdInput);
-
-        const simSelectionItem = document.createElement('li');
-        simSelectionItem.replaceChildren(simText, this.simDropdown);
-
         this.checkboxContainer = document.createElement('div');
         this.checkboxContainer.classList.add('meld-solver-settings');
         this.checkboxContainer.replaceChildren(
-            overwriteMateriaItem,
-            targetGcdItem,
-            simSelectionItem
+            quickElement('li', [], [this.overwriteMateriaCheckbox]),
+            quickElement('li', [], [this.useTargetGcdCheckbox, this.targetGcdInput]),
+            quickElement('li', [], [simText, this.simDropdown])
         );
 
-        this.useTargetGcdCheckBox.onclick = (evt) => {
+        this.useTargetGcdCheckbox.onclick = (evt) => {
             this.targetGcdInput.disabled = !this.targetGcdInput.disabled;
         };
 
         this.replaceChildren(this.checkboxContainer);
-        this.disableables = [this.overwriteMateriaCheckbox, this.useTargetGcdCheckBox, this.targetGcdInput, this.simDropdown];
+        this.disableables = [this.overwriteMateriaCheckbox, this.useTargetGcdCheckbox, this.targetGcdInput, this.simDropdown];
     }
 
     setEnabled(enabled: boolean) {
