@@ -2,7 +2,7 @@ import {
     FieldBoundCheckBox,
     FieldBoundDataSelect,
     FieldBoundFloatField,
-    labelFor,
+    labeledCheckbox,
     makeActionButton
 } from "@xivgear/common-ui/components/util";
 import {CharacterGearSet} from "@xivgear/core/gear";
@@ -177,9 +177,8 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
     public gearsetGenSettings: GearsetGenerationSettings;
     public simSettings: SolverSimulationSettings;
 
-    private overwriteMateriaText: HTMLSpanElement;
-    private overwriteMateriaCheckbox: FieldBoundCheckBox<GearsetGenerationSettings>;
-    private useTargetGcdCheckBox: FieldBoundCheckBox<GearsetGenerationSettings>;
+    private overwriteMateriaCheckbox: HTMLDivElement;
+    private useTargetGcdCheckBox: HTMLDivElement;
     private targetGcdInput: FieldBoundFloatField<GearsetGenerationSettings>;
 
     private checkboxContainer: HTMLDivElement;
@@ -226,24 +225,15 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
             fixDecimals: 2,
         });
 
-        this.useTargetGcdCheckBox = new FieldBoundCheckBox(this.gearsetGenSettings, 'useTargetGcd');
-        this.useTargetGcdCheckBox.classList.add('meld-solver-settings');
+        this.useTargetGcdCheckBox = labeledCheckbox("Target GCD: ", new FieldBoundCheckBox(this.gearsetGenSettings, 'useTargetGcd'));
         this.targetGcdInput.pattern = '\\d\\.\\d\\d?';
         this.targetGcdInput.title = 'Solve for the best set with this GCD';
         this.targetGcdInput.classList.add('meld-solver-target-gcd-input');
 
-        const targetGcdText = labelFor("Target GCD: ", this.useTargetGcdCheckBox);
-        targetGcdText.textContent = "Target GCD: ";
-        targetGcdText.classList.add('meld-solver-settings');
-
-        this.overwriteMateriaCheckbox = new FieldBoundCheckBox(this.gearsetGenSettings, 'overwriteExistingMateria');
-        this.overwriteMateriaCheckbox.classList.add('meld-solver-settings');
-        this.overwriteMateriaText = labelFor("Overwrite existing materia?", this.overwriteMateriaCheckbox);
-        this.overwriteMateriaText.classList.add('meld-solver-settings');
+        this.overwriteMateriaCheckbox = labeledCheckbox("Overwrite existing materia", new FieldBoundCheckBox(this.gearsetGenSettings, 'overwriteExistingMateria'));
 
         const simText = document.createElement('span');
         simText.textContent = "Sim: ";
-        simText.classList.add('meld-solver-settings');
 
         this.simDropdown = new FieldBoundDataSelect<typeof this.simSettings, Simulation<SimResult, unknown, unknown>>(
             this.simSettings,
@@ -255,21 +245,21 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
         );
         this.simDropdown.classList.add('meld-solver-sim-dropdown');
 
-        const span1 = document.createElement('li');
-        span1.replaceChildren(this.overwriteMateriaCheckbox, this.overwriteMateriaText);
+        const overwriteMateriaItem = document.createElement('li');
+        overwriteMateriaItem.replaceChildren(this.overwriteMateriaCheckbox);
 
-        const span2 = document.createElement('li');
-        span2.replaceChildren(this.useTargetGcdCheckBox, targetGcdText, this.targetGcdInput);
+        const targetGcdItem = document.createElement('li');
+        targetGcdItem.replaceChildren(this.useTargetGcdCheckBox, this.targetGcdInput);
 
-        const span3 = document.createElement('li');
-        span3.replaceChildren(simText, this.simDropdown);
+        const simSelectionItem = document.createElement('li');
+        simSelectionItem.replaceChildren(simText, this.simDropdown);
 
         this.checkboxContainer = document.createElement('div');
         this.checkboxContainer.classList.add('meld-solver-settings');
         this.checkboxContainer.replaceChildren(
-            span1,
-            span2,
-            span3
+            overwriteMateriaItem,
+            targetGcdItem,
+            simSelectionItem
         );
 
         this.useTargetGcdCheckBox.onclick = (evt) => {
