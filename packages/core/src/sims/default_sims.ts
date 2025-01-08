@@ -23,6 +23,8 @@ import {pldUsageSimSpec} from "./tank/pld/pld_usage_sim_no_sks";
 import {pldSKSSheetSpec} from "./tank/pld/pldsks_sim";
 import {warSpec} from "./tank/war/war_sheet_sim";
 import {drkSpec} from "./tank/drk/drk_sheet_sim";
+import {gnbSpec} from "./tank/gnb/gnb_sheet_sim";
+import {pldSpec} from "./tank/pld/pld_sheet_sim";
 
 let registrationDone = false;
 
@@ -34,11 +36,16 @@ export function registerDefaultSims() {
     else {
         registrationDone = true;
     }
+    // General
     registerSim(potRatioSimSpec);
+    // Tanks
     registerSim(pldUsageSimSpec);
     registerSim(pldSKSSheetSpec);
     registerSim(drkSpec);
     registerSim(warSpec);
+    registerSim(gnbSpec);
+    registerSim(pldSpec);
+    // Healers
     registerSim(whmSheetSpec);
     registerSim(sgeSheetSpec);
     registerSim(sgeNewSheetSpec);
@@ -46,16 +53,19 @@ export function registerDefaultSims() {
     registerSim(schNewSheetSpec);
     registerSim(whmNewSheetSpec);
     registerSim(mpSimSpec);
+    // Melee
     registerSim(rprSheetSpec);
     registerSim(vprSheetSpec);
     registerSim(mnkSpec);
     registerSim(ninSpec);
     registerSim(samSpec);
+    // Ranged
+    registerSim(dncDtSheetSpec);
+    // Caster
     registerSim(BluWinged120Spec);
     registerSim(BluFlame120Spec);
     registerSim(BluBreath60Spec);
     registerSim(BluWinged60Spec);
     registerSim(BluFlame60Spec);
     registerSim(BluF2PSpec);
-    registerSim(dncDtSheetSpec);
 }

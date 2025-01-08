@@ -5,7 +5,7 @@ import {PersonalBuff} from "@xivgear/core/sims/sim_types";
 
 /** A WAR-specific ability. */
 export type WarAbility = Ability & Readonly<{
-    /** Run if an ability needs to update the Blood gauge */
+    /** Run if an ability needs to update the Beast gauge */
     updateBeastGauge?(gauge: WarGauge): void;
 
     /** The Beast Gauge cost of the ability */
@@ -16,14 +16,13 @@ export type WarGcdAbility = GcdAbility & WarAbility;
 
 export type WarOgcdAbility = OgcdAbility & WarAbility;
 
-/** WAR ability that costs blood */
+/** WAR ability that costs gauge */
 export type BeastGaugeAbility = WarAbility & Readonly<{
     beastGaugeCost: number;
 }>
 
 /** Represents the WAR gauge state */
 export type WarGaugeState = {
-    level: number,
     beastGauge: number,
 }
 

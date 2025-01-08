@@ -49,7 +49,7 @@ import {
     RaceName,
     STAT_ABBREVIATIONS
 } from "@xivgear/xivmath/xivconstants";
-import {getCurrentHash} from "../nav_hash";
+import {getCurrentHash, getCurrentState} from "../nav_hash";
 import {MateriaTotalsDisplay} from "./materia";
 import {FoodItemsTable, FoodItemViewTable, GearItemsTable, GearItemsViewTable} from "./items";
 import {SetViewToolbar} from "./totals_display";
@@ -71,7 +71,7 @@ import {simpleAutoResultTable} from "../sims/components/simple_tables";
 import {rangeInc} from "@xivgear/core/util/array_utils";
 import {SimCurrentResult, SimResult, SimSettings, SimSpec, Simulation} from "@xivgear/core/sims/sim_types";
 import {getRegisteredSimSpecs} from "@xivgear/core/sims/sim_registry";
-import {makeUrl} from "@xivgear/core/nav/common_nav";
+import {makeUrl, NavState, ONLY_SET_QUERY_PARAM} from "@xivgear/core/nav/common_nav";
 import {simMaintainersInfoElement} from "./sims";
 import {SaveAsModal} from "./new_sheet_form";
 import {DropdownActionMenu} from "./dropdown_actions_menu";
@@ -103,7 +103,7 @@ function mainStatCol(sheet: GearPlanSheet, stat: RawStatKey): CustomColumnSpec<C
         }),
         condition: () => sheet.isStatRelevant(stat),
         renderer: multiplierStatTooltip,
-        extraClasses: ['stat-col', 'main-stat-col'],
+        extraClasses: ['stat-col', 'main-stat-col', 'stat-col-less-important'],
         rowCondition: noSeparators,
     };
 }
@@ -118,7 +118,7 @@ function tooltipMultiStatCol(sheet: GearPlanSheet, stat: RawStatKey, multiKey: {
         }),
         condition: () => sheet.isStatRelevant(stat),
         renderer: multiplierStatTooltip,
-        extraClasses: ['stat-col', 'compact-multiplier-stat-col'],
+        extraClasses: ['stat-col', 'compact-multiplier-stat-col', 'stat-col-less-important'],
         rowCondition: noSeparators,
     };
 }
@@ -489,14 +489,14 @@ export class GearPlanTable extends CustomTable<CharacterGearSet, GearSetSel> {
                 }),
                 initialWidth: statColWidth,
                 renderer: multiplierStatTooltip,
-                extraClasses: ['stat-col'],
+                extraClasses: ['stat-col', 'stat-col-less-important'],
                 rowCondition: noSeparators,
             } as CustomColumnSpec<CharacterGearSet, MultiplierStat>,
             {
                 shortName: "hp",
                 displayName: "HP",
                 getter: gearSet => gearSet.computedStats.hp,
-                extraClasses: ['stat-col', 'stat-col-hp'],
+                extraClasses: ['stat-col', 'stat-col-hp', 'stat-col-less-important'],
                 rowCondition: noSeparators,
             },
             {
@@ -523,7 +523,7 @@ export class GearPlanTable extends CustomTable<CharacterGearSet, GearSetSel> {
                 }) as ChanceStat,
                 renderer: chanceStatDisplay,
                 condition: () => this.sheet.isStatRelevant('crit'),
-                extraClasses: ['stat-col', 'chance-stat-col'],
+                extraClasses: ['stat-col', 'chance-stat-col', 'stat-col-less-important'],
                 rowCondition: noSeparators,
             },
             {
@@ -536,7 +536,7 @@ export class GearPlanTable extends CustomTable<CharacterGearSet, GearSetSel> {
                 }) as ChanceStat,
                 renderer: chanceStatDisplay,
                 condition: () => this.sheet.isStatRelevant('dhit'),
-                extraClasses: ['stat-col', 'chance-stat-col'],
+                extraClasses: ['stat-col', 'chance-stat-col', 'stat-col-less-important'],
                 rowCondition: noSeparators,
             },
             {
@@ -548,7 +548,7 @@ export class GearPlanTable extends CustomTable<CharacterGearSet, GearSetSel> {
                 }) as MultiplierStat,
                 renderer: multiplierStatDisplay,
                 condition: () => this.sheet.isStatRelevant('determination'),
-                extraClasses: ['stat-col', 'multiplier-stat-col'],
+                extraClasses: ['stat-col', 'multiplier-stat-col', 'stat-col-less-important'],
                 rowCondition: noSeparators,
             },
             {
@@ -568,6 +568,7 @@ export class GearPlanTable extends CustomTable<CharacterGearSet, GearSetSel> {
                 initialWidth: statColWidth,
                 condition: () => this.sheet.isStatRelevant('piety'),
                 rowCondition: noSeparators,
+                extraClasses: ['stat-col-less-important'],
             },
             {
                 shortName: "tenacity",
@@ -579,7 +580,7 @@ export class GearPlanTable extends CustomTable<CharacterGearSet, GearSetSel> {
                 }) as MultiplierMitStat,
                 renderer: multiplierMitStatDisplay,
                 condition: () => this.sheet.isStatRelevant('tenacity'),
-                extraClasses: ['stat-col', 'multiplier-mit-stat-col'],
+                extraClasses: ['stat-col', 'multiplier-mit-stat-col', 'stat-col-less-important'],
                 rowCondition: noSeparators,
             },
             ...(viewOnly ? [] : simColumns),
@@ -1030,7 +1031,8 @@ export class GearSetViewer extends HTMLElement {
         if (this.sheet.isEmbed) {
             const headingLink = document.createElement('a');
             const hash = getCurrentHash();
-            const linkUrl = makeUrl(...hash.slice(1));
+            const linkUrl = makeUrl(new NavState(hash.slice(1), undefined, getCurrentState().onlySetIndex));
+            linkUrl.searchParams.delete(ONLY_SET_QUERY_PARAM);
             headingLink.href = linkUrl.toString();
             headingLink.target = '_blank';
             headingLink.replaceChildren(this.gearSet.name, faIcon('fa-arrow-up-right-from-square', 'fa'));
@@ -1253,6 +1255,7 @@ export class GearPlanSheetGui extends GearPlanSheet {
     private readonly _loadingScreen: LoadingBlocker;
     private _gearEditToolBar: GearEditToolbar;
     private _selectFirstRowByDefault: boolean = false;
+    private _defaultSelectionIndex: number | undefined = undefined;
     readonly headerArea: HTMLDivElement;
     readonly tableArea: HTMLDivElement;
     readonly tableHolderOuter: HTMLDivElement;
@@ -1334,6 +1337,14 @@ export class GearPlanSheetGui extends GearPlanSheet {
 
     setSelectFirstRowByDefault() {
         this._selectFirstRowByDefault = true;
+    }
+
+    get defaultSelectionIndex(): number | undefined {
+        return this._defaultSelectionIndex;
+    }
+
+    set defaultSelectionIndex(value: number | undefined) {
+        this._defaultSelectionIndex = value;
     }
 
     private get editorItem() {
@@ -1442,7 +1453,7 @@ export class GearPlanSheetGui extends GearPlanSheet {
                     const set = new CharacterGearSet(this);
                     set.name = 'Separator';
                     set.isSeparator = true;
-                    this.addGearSet(set);
+                    this.addGearSet(set, undefined, true);
                 },
             });
             // const renameButton = makeActionButton("Sheet Name/Description", () => {
@@ -1738,7 +1749,16 @@ export class GearPlanSheetGui extends GearPlanSheet {
             document.addEventListener('pointerup', after);
         });
 
-        if (this._selectFirstRowByDefault && this.sets.length >= 1) {
+        if (this._defaultSelectionIndex !== undefined) {
+            const characterGearSet = this.sets[this._defaultSelectionIndex];
+            if (characterGearSet) {
+                this._gearPlanTable.selectGearSet(characterGearSet);
+            }
+            else {
+                console.error("Invalid selection index", this._defaultSelectionIndex);
+            }
+        }
+        else if (this._selectFirstRowByDefault && this.sets.length >= 1) {
             // First, try to select a real gear set
             const firstNonSeparator = this.sets.find(set => !set.isSeparator);
             // Failing that, just select whatever
@@ -2012,7 +2032,7 @@ export class ImportSetsModal extends BaseModal {
             switch (parsed.importType) {
                 case "json":
                     try {
-                        this.doJsonImport(parsed.rawData);
+                        this.doJsonImport(parsed.rawData, undefined);
                     }
                     catch (e) {
                         console.error('Import error', e);
@@ -2020,7 +2040,7 @@ export class ImportSetsModal extends BaseModal {
                     }
                     return;
                 case "shortlink":
-                    this.doAsyncImport(() => getShortLink(decodeURIComponent(parsed.rawUuid)));
+                    this.doAsyncImport(() => getShortLink(decodeURIComponent(parsed.rawUuid)), parsed.onlySetIndex);
                     return;
                 case "etro":
                     this.ready = false;
@@ -2041,7 +2061,7 @@ export class ImportSetsModal extends BaseModal {
                     });
                     return;
                 case "bis":
-                    this.doAsyncImport(() => getBisSheet(...parsed.path));
+                    this.doAsyncImport(() => getBisSheet(...parsed.path), parsed.onlySetIndex);
                     return;
             }
         }
@@ -2049,10 +2069,10 @@ export class ImportSetsModal extends BaseModal {
         alert('That doesn\'t look like a valid import.');
     }
 
-    doAsyncImport(provider: () => Promise<string>) {
+    doAsyncImport(provider: () => Promise<string>, onlySetIndex: number | undefined) {
         this.ready = false;
         provider().then(raw => {
-            this.doJsonImport(raw);
+            this.doJsonImport(raw, onlySetIndex);
             this.ready = true;
         }, err => {
             this.ready = true;
@@ -2061,20 +2081,31 @@ export class ImportSetsModal extends BaseModal {
         });
     }
 
-    doJsonImport(text: string) {
+    doJsonImport(text: string, onlySetIndex: number | undefined) {
         const rawImport = JSON.parse(text);
         if ('sets' in rawImport && rawImport.sets.length) {
             if (!this.checkJob(true, rawImport.job)) {
                 return;
             }
-            // import everything
-            if (confirm(`This will import ${rawImport.sets.length} gear sets into this sheet.`)) {
-                const sets: SetExport[] = rawImport.sets;
-                const imports = sets.map(set => this.sheet.importGearSet(set));
-                for (let i = 0; i < imports.length; i++) {
-                    // Select the first imported set
-                    const set = imports[i];
-                    this.sheet.addGearSet(set, undefined, i === 0);
+            const sets: SetExport[] = rawImport.sets;
+            if (onlySetIndex !== undefined) {
+                const theSet = sets[onlySetIndex];
+                if (!theSet) {
+                    console.error(`Index ${onlySetIndex} is not valid with sets length of ${sets.length}`);
+                    alert("Not valid");
+                }
+                const imported = this.sheet.importGearSet(theSet);
+                this.sheet.addGearSet(imported, undefined, true);
+            }
+            else {
+                // import everything
+                if (confirm(`This will import ${rawImport.sets.length} gear sets into this sheet.`)) {
+                    const imports = sets.map(set => this.sheet.importGearSet(set));
+                    for (let i = 0; i < imports.length; i++) {
+                        // Select the first imported set
+                        const set = imports[i];
+                        this.sheet.addGearSet(set, undefined, i === 0);
+                    }
                 }
             }
             closeModal();

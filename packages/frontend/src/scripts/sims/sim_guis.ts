@@ -17,6 +17,8 @@ import {SgeSimGui} from "./healer/sge_sheet_sim_ui";
 import {BluSimGui} from "./blu/blu_common_ui";
 import {DrkSimGui} from "./tank/drk_sheet_sim_ui";
 import {WarSimGui} from "./tank/war_sheet_sim_ui";
+import {GnbSimGui} from "./tank/gnb_sheet_sim_ui";
+import {PldSimGui} from "./tank/pld_sheet_sim_ui";
 import {pldSKSSimGui} from "./tank/pldsks_sheet_sim_ui";
 import {MPSimGui} from "./healer/healer_mp_sim_ui";
 
@@ -35,6 +37,8 @@ import {dncDtSheetSpec} from "@xivgear/core/sims/ranged/dnc_sim";
 import {pldUsageSimSpec} from "@xivgear/core/sims/tank/pld/pld_usage_sim_no_sks";
 import {warSpec} from "@xivgear/core/sims/tank/war/war_sheet_sim";
 import {drkSpec} from "@xivgear/core/sims/tank/drk/drk_sheet_sim";
+import {gnbSpec} from "@xivgear/core/sims/tank/gnb/gnb_sheet_sim";
+import {pldSpec} from "@xivgear/core/sims/tank/pld/pld_sheet_sim";
 import {pldSKSSheetSpec} from "@xivgear/core/sims/tank/pld/pldsks_sim";
 import {BluBreath60Spec} from "@xivgear/core/sims/blu/blu_breath60";
 import {BluFlame120Spec} from "@xivgear/core/sims/blu/blu_flame120";
@@ -47,7 +51,7 @@ import {mpSimSpec} from "@xivgear/core/sims/healer/healer_mp";
 
 
 type SimGuiCtor<X extends Simulation<SimResult, unknown, unknown>> = {
-    new (sim: X): SimulationGui<ResultTypeOfSim<X>, SettingsTypeOfSim<X>, ExportSettingsTypeOfSim<X>>;
+    new(sim: X): SimulationGui<ResultTypeOfSim<X>, SettingsTypeOfSim<X>, ExportSettingsTypeOfSim<X>>;
 }
 
 function registerGui<X extends Simulation<SimResult, unknown, unknown>>(simSpec: SimSpec<X, unknown>, guiCtor: SimGuiCtor<X>) {
@@ -58,6 +62,11 @@ function getGuiCtor<X extends Simulation<never, never, never>>(simSpec: SimSpec<
     return simGuiMap.get(simSpec as SimSpec<never, never>);
 }
 
+/**
+ * Given a simulation, construct a {@link SimulationGui} instance most appropriate for that sim.
+ *
+ * @param sim The simulation
+ */
 export function makeGui<X extends Simulation<SimResult, unknown, unknown>>(sim: X): SimulationGui<ResultTypeOfSim<X>, SettingsTypeOfSim<X>, ExportSettingsTypeOfSim<X>> {
     const ctor: SimGuiCtor<X> = getGuiCtor(sim.spec);
     return new ctor(sim);
@@ -65,27 +74,35 @@ export function makeGui<X extends Simulation<SimResult, unknown, unknown>>(sim: 
 
 export const simGuiMap: Map<SimSpec<never, never>, SimGuiCtor<never>> = new Map;
 
+// General
 registerGui(potRatioSimSpec, PotencyRatioSimGui);
+// Tanks
 registerGui(pldUsageSimSpec, BaseUsageCountSimGui);
 registerGui(pldSKSSheetSpec, pldSKSSimGui);
-registerGui(whmSheetSpec, WhmSheetSimGui);
-registerGui(sgeSheetSpec, SgeSimGui);
 registerGui(drkSpec, DrkSimGui);
 registerGui(warSpec, WarSimGui);
+registerGui(gnbSpec, GnbSimGui);
+registerGui(pldSpec, PldSimGui);
+// Healers
+registerGui(whmSheetSpec, WhmSheetSimGui);
+registerGui(sgeSheetSpec, SgeSimGui);
 registerGui(sgeNewSheetSpec, SgeSheetSimGui);
 registerGui(astNewSheetSpec, AstSheetSimGui);
 registerGui(schNewSheetSpec, SchSimGui);
 registerGui(whmNewSheetSpec, WhmSimGui);
+registerGui(mpSimSpec, MPSimGui);
+// Melee
 registerGui(rprSheetSpec, RprSheetSimGui);
 registerGui(vprSheetSpec, VprSimGui);
 registerGui(ninSpec, NinSheetSimGui);
 registerGui(mnkSpec, MnkSimGui);
 registerGui(samSpec, SamSimGui);
+// Ranged
+registerGui(dncDtSheetSpec, BaseUsageCountSimGui);
+// Caster
 registerGui(BluWinged120Spec, BluSimGui);
 registerGui(BluFlame120Spec, BluSimGui);
 registerGui(BluBreath60Spec, BluSimGui);
 registerGui(BluWinged60Spec, BluSimGui);
 registerGui(BluFlame60Spec, BluSimGui);
 registerGui(BluF2PSpec, BluSimGui);
-registerGui(dncDtSheetSpec, BaseUsageCountSimGui);
-registerGui(mpSimSpec, MPSimGui);
