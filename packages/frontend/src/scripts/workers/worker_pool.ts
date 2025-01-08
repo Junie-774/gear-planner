@@ -1,8 +1,10 @@
+import {CharacterGearSet} from "@xivgear/core/gear";
 import {GearPlanSheet} from "@xivgear/core/sheet";
-import {GearsetGenerationSettingsExport} from "@xivgear/core/solving/gearset_generation";
-import {SolverSimulationSettingsExport} from "@xivgear/core/solving/sim_runner";
+import {Simulation, SimResult} from "@xivgear/core/sims/sim_types";
+import {GearsetGenerationSettings} from "@xivgear/core/solving/gearset_generation";
+import {SolverSimulationSettings} from "@xivgear/core/solving/sim_runner";
 import {range} from "@xivgear/core/util/array_utils";
-import {SheetExport} from "@xivgear/xivmath/geartypes";
+import {SetExport, SheetExport, SimExport} from "@xivgear/xivmath/geartypes";
 
 type ResolveReject = {
     resolve: (res: unknown) => void,
@@ -15,9 +17,20 @@ type WorkRequest<JobType extends string, RequestDataType> = {
     data: RequestDataType,
 }
 
+export type Serialized<X> =
+    X extends CharacterGearSet ? SetExport :
+    X extends Simulation<SimResult, unknown, unknown> ? SimExport :
+    X extends boolean ? boolean :
+    X extends number ? number :
+    X extends string ? string :
+    X extends unknown[] ? Serialized<X[number]>[] :
+    {
+        [K in keyof X]: Serialized<X[K]>
+    };
+
 export type InitializationRequest = WorkRequest<'workerInitialization', SheetExport>;
-export type GearsetGenerationRequest = WorkRequest<'generateGearset', GearsetGenerationSettingsExport>
-export type SolverSimulationRequest = WorkRequest<'solverSimulation', SolverSimulationSettingsExport>
+export type GearsetGenerationRequest = WorkRequest<'generateGearset', Serialized<GearsetGenerationSettings>>;
+export type SolverSimulationRequest = WorkRequest<'solverSimulation', Serialized<SolverSimulationSettings>>;
 
 export type AnyWorkRequest =
     InitializationRequest

@@ -1,36 +1,22 @@
-import {EquippedItem, RawStats, EquipmentSet, EquipSlots, MeldableMateriaSlot, SetExport} from "@xivgear/xivmath/geartypes";
+import {EquippedItem, RawStats, EquipmentSet, EquipSlots, MeldableMateriaSlot} from "@xivgear/xivmath/geartypes";
 import {MateriaSubstat, ALL_SUB_STATS, NORMAL_GCD, MATERIA_ACCEPTABLE_OVERCAP_LOSS} from "@xivgear/xivmath/xivconstants";
 import {sksToGcd, spsToGcd} from "@xivgear/xivmath/xivmath";
 import {CharacterGearSet} from "../gear";
 import {GearPlanSheet} from "../sheet";
 
-export class GearsetGenerationSettings {
+export type GearsetGenerationSettings = {
     gearset: CharacterGearSet;
     overwriteExistingMateria: boolean;
     useTargetGcd: boolean;
     targetGcd: number;
-
-    constructor(gearset: CharacterGearSet, overwrite: boolean, useTargetGcd: boolean, targetGcd: number) {
-        this.gearset = gearset;
-        this.overwriteExistingMateria = overwrite;
-        this.useTargetGcd = useTargetGcd;
-        this.targetGcd = targetGcd;
-    }
-
-    static export(settings: GearsetGenerationSettings, sheet: GearPlanSheet): GearsetGenerationSettingsExport {
-        return {
-            ...settings,
-            gearset: sheet.exportGearSet(settings.gearset),
-        };
-    }
 }
 
-export class GearsetGenerationSettingsExport {
-    gearset: SetExport;
-    overwriteExistingMateria: boolean;
-    useTargetGcd: boolean;
-    targetGcd: number;
-}
+export const exportGearsetGenSettings = (settings: GearsetGenerationSettings, sheet: GearPlanSheet) => {
+    return {
+        ...settings,
+        gearset: sheet.exportGearSet(settings.gearset),
+    };
+};
 
 class ItemWithStats {
     item: EquippedItem;
@@ -214,7 +200,6 @@ export class GearsetGenerator {
             for (const item of itemsToAdd) {
                 meldCombinations.set(item[0], item[1]);
             }
-
         }
 
         return new Set(meldCombinations.values());

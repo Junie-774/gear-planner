@@ -6,30 +6,25 @@ import {GearPlanSheet} from "../sheet";
 export class SolverSimulationSettings {
     sim: Simulation<SimResult, unknown, unknown>;
     sets: CharacterGearSet[];
+};
 
-    static import(settingsExp: SolverSimulationSettingsExport, sheet: GearPlanSheet): SolverSimulationSettings {
-        return {
-            sets: settingsExp.sets.map(sheet.importGearSet),
-            sim: sheet.importSim(settingsExp.sim),
-        };
-    }
+export const exportSolverSimulationSettings = (settings: SolverSimulationSettings, sheet: GearPlanSheet) => {
+    return {
+        sets: settings.sets?.map(set => sheet.exportGearSet(set)),
+        sim: {
+            stub: settings.sim.spec.stub,
+            settings: settings.sim.exportSettings() as SimSettings,
+            name: settings.sim.displayName,
+        },
+    };
+};
 
-    static export(settings: SolverSimulationSettings, sheet: GearPlanSheet): SolverSimulationSettingsExport {
-        return {
-            sets: settings.sets?.map(set => sheet.exportGearSet(set)),
-            sim: {
-                stub: settings.sim.spec.stub,
-                settings: settings.sim.exportSettings() as SimSettings,
-                name: settings.sim.displayName,
-            },
-        };
-    }
-}
-
-export class SolverSimulationSettingsExport {
-    sim: SimExport;
-    sets: SetExport[];
-}
+export const importSolverSimulationSettings = (settingsExp: {sim: SimExport, sets: SetExport[]}, sheet: GearPlanSheet) => {
+    return {
+        sets: settingsExp.sets.map(sheet.importGearSet),
+        sim: sheet.importSim(settingsExp.sim),
+    };
+};
 
 export class SimRunner<SimType extends Simulation<SimResult, unknown, unknown>> {
 

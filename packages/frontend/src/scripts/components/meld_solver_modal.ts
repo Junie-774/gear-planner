@@ -176,10 +176,12 @@ class MeldSolverProgressDisplay extends HTMLDivElement {
 class MeldSolverSettingsMenu extends HTMLDivElement {
     public gearsetGenSettings: GearsetGenerationSettings;
     public simSettings: SolverSimulationSettings;
+
     private overwriteMateriaText: HTMLSpanElement;
     private overwriteMateriaCheckbox: FieldBoundCheckBox<GearsetGenerationSettings>;
     private useTargetGcdCheckBox: FieldBoundCheckBox<GearsetGenerationSettings>;
     private targetGcdInput: FieldBoundFloatField<GearsetGenerationSettings>;
+
     private checkboxContainer: HTMLDivElement;
     private simDropdown: FieldBoundDataSelect<SolverSimulationSettings, Simulation<SimResult, unknown, unknown>>;
 
@@ -195,7 +197,13 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
         }
         gcd = Math.min(set.computedStats.gcdPhys(2.5, haste), set.computedStats.gcdMag(2.5, haste));
 
-        this.gearsetGenSettings = new GearsetGenerationSettings(set, false, true, gcd);
+        this.gearsetGenSettings = {
+            gearset: set,
+            overwriteExistingMateria: false,
+            useTargetGcd: true,
+            targetGcd: gcd,
+        };
+
         this.simSettings = {
             sim: sheet.sims.at(0),
             sets: undefined, // Not referenced in UI

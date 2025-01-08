@@ -3,8 +3,8 @@ import {SetExport, SimExport} from "@xivgear/xivmath/geartypes";
 import {SimResult, SimSettings, Simulation} from "@xivgear/core/sims/sim_types";
 import {GearPlanSheet} from "@xivgear/core/sheet";
 import {GearsetGenerationRequest, SolverSimulationRequest, workerPool} from "../workers/worker_pool";
-import {GearsetGenerationSettings} from "@xivgear/core/solving/gearset_generation";
-import {SolverSimulationSettings} from "@xivgear/core/solving/sim_runner";
+import {exportGearsetGenSettings, GearsetGenerationSettings} from "@xivgear/core/solving/gearset_generation";
+import {exportSolverSimulationSettings, SolverSimulationSettings} from "@xivgear/core/solving/sim_runner";
 import {range} from "@xivgear/core/util/array_utils";
 
 export class MeldSolverSettings {
@@ -65,7 +65,7 @@ export class MeldSolver {
         const gearsetGenRequest: GearsetGenerationRequest = {
             jobType: 'generateGearset',
             sheet: this._sheet.exportSheet(),
-            data: GearsetGenerationSettings.export(gearsetGenSettings, this._sheet),
+            data: exportGearsetGenSettings(gearsetGenSettings, this._sheet),
         };
 
         const gearGenJob = workerPool.requestWork(gearsetGenRequest);
@@ -94,7 +94,7 @@ export class MeldSolver {
                 jobType: 'solverSimulation',
                 sheet: this._sheet.exportSheet(),
                 data: {
-                    ...SolverSimulationSettings.export(simSettings, this._sheet),
+                    ...exportSolverSimulationSettings(simSettings, this._sheet),
                     sets: jobSets,
                 },
             };
