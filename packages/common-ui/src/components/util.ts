@@ -450,6 +450,19 @@ export class FieldBoundDataSelect<ObjType, DataType> extends DataSelect<DataType
     }
 }
 
+export function questionMarkTooltip(text: string): HTMLDivElement {
+    const container = document.createElement('div');
+    container.classList.add('tooltip');
+    container.setAttribute('title', text);
+
+    const qMark = document.createElement('span');
+    qMark.textContent = "?";
+    qMark.style.fontSize = "small";
+    qMark.style.margin = "auto";
+
+    container.replaceChildren(qMark);
+    return container;
+}
 export function labeledComponent(label: string, check: HTMLElement): HTMLDivElement {
     const labelElement = labelFor(label, check);
     const div = document.createElement("div");

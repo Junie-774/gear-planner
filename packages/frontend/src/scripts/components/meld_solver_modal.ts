@@ -4,12 +4,13 @@ import {
     FieldBoundFloatField,
     labeledCheckbox,
     makeActionButton,
+    questionMarkTooltip,
     quickElement
 } from "@xivgear/common-ui/components/util";
 import {CharacterGearSet} from "@xivgear/core/gear";
 import {GearPlanSheetGui} from "./sheet";
 import {SimResult, Simulation} from "@xivgear/core/sims/sim_types";
-import {MAX_GCD, STAT_ABBREVIATIONS} from "@xivgear/xivmath/xivconstants";
+import {MATERIA_ACCEPTABLE_OVERCAP_LOSS, MAX_GCD, STAT_ABBREVIATIONS} from "@xivgear/xivmath/xivconstants";
 import {BaseModal} from "@xivgear/common-ui/components/modal";
 import {EquipSlots} from "@xivgear/xivmath/geartypes";
 import {MeldSolverSettings, MeldSolver} from "./meldsolver";
@@ -252,7 +253,10 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
         this.checkboxContainer.replaceChildren(
             quickElement('li', [], [this.overwriteMateriaCheckbox]),
             quickElement('li', [], [this.useTargetGcdCheckbox, this.targetGcdInput]),
-            quickElement('li', [], [labeledCheckbox("Allow substat overcap", new FieldBoundCheckBox(this.gearsetGenSettings, 'allowSubstatOvercap'))]),
+            quickElement('li', [], [
+                labeledCheckbox("Allow substat overcap", new FieldBoundCheckBox(this.gearsetGenSettings, 'allowSubstatOvercap')),
+                questionMarkTooltip(`Allows for melds which overcap substats by more than normal (${MATERIA_ACCEPTABLE_OVERCAP_LOSS}) when solving.\nPotentially finds some better meld combinations, but increases solve time considerably.`),
+            ]),
             quickElement('li', [], [simText, this.simDropdown])
         );
 
