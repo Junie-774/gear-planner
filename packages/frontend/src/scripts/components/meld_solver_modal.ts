@@ -202,6 +202,7 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
             overwriteExistingMateria: false,
             useTargetGcd: true,
             targetGcd: gcd,
+            allowSubstatOvercap: false,
         };
 
         this.simSettings = {
@@ -251,6 +252,7 @@ class MeldSolverSettingsMenu extends HTMLDivElement {
         this.checkboxContainer.replaceChildren(
             quickElement('li', [], [this.overwriteMateriaCheckbox]),
             quickElement('li', [], [this.useTargetGcdCheckbox, this.targetGcdInput]),
+            quickElement('li', [], [labeledCheckbox("Allow substat overcap", new FieldBoundCheckBox(this.gearsetGenSettings, 'allowSubstatOvercap'))]),
             quickElement('li', [], [simText, this.simDropdown])
         );
 

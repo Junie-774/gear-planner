@@ -9,6 +9,7 @@ export type GearsetGenerationSettings = {
     overwriteExistingMateria: boolean;
     useTargetGcd: boolean;
     targetGcd: number;
+    allowSubstatOvercap: boolean;
 }
 
 export const exportGearsetGenSettings = (settings: GearsetGenerationSettings, sheet: GearPlanSheet) => {
@@ -83,7 +84,7 @@ export class GearsetGenerator {
         for (const slotKey of EquipSlots) {
             if (equipment[slotKey] === null || equipment[slotKey] === undefined) continue;
 
-            const pieceCombinations = this.getAllMeldCombinationsForGearItem(equipment[slotKey]);
+            const pieceCombinations = this.getAllMeldCombinationsForGearItem(equipment[slotKey], settings);
             allIndividualGearPieces.set(slotKey, pieceCombinations);
         }
 
@@ -157,8 +158,9 @@ export class GearsetGenerator {
         return generatedGearsets;
     }
 
-    public getAllMeldCombinationsForGearItem(equippedItem: EquippedItem): Set<ItemWithStats> | null {
+    public getAllMeldCombinationsForGearItem(equippedItem: EquippedItem, settings: GearsetGenerationSettings): Set<ItemWithStats> | null {
         const meldCombinations: Map<string, ItemWithStats> = new Map<string, ItemWithStats>();
+        const relevantNonCappedStats = this.relevantStats.filter(stat => equippedItem.gearItem.primarySubstat !== stat);
 
         const basePiece = new ItemWithStats(this.cloneEquippedItem(equippedItem), this.getPieceEffectiveStats(equippedItem));
         meldCombinations.set(this.statsToString(equippedItem.gearItem.stats, this.relevantStats), basePiece);
@@ -176,15 +178,16 @@ export class GearsetGenerator {
 
                 const stats = existingCombination.stats;
 
-                for (const stat of this.relevantStats) {
+                for (const stat of relevantNonCappedStats) {
 
                     const materia = this._sheet.getBestMateria(stat, existingCombination.item.melds[slotNum]);
 
                     const newStats: RawStats = Object.assign({}, stats);
-                    newStats[stat] += materia.primaryStatValue;
+                    const overcap = stats[stat] + materia.primaryStatValue - existingCombination.item.gearItem.statCaps[stat];
+                    newStats[stat] += materia.primaryStatValue - overcap;
                     const newStatsKey = this.statsToString(newStats, this.relevantStats);
 
-                    if (stats[stat] + materia.primaryStatValue - existingCombination.item.gearItem.statCaps[stat] < MATERIA_ACCEPTABLE_OVERCAP_LOSS
+                    if ( (settings.allowSubstatOvercap || overcap < MATERIA_ACCEPTABLE_OVERCAP_LOSS)
                         && !itemsToAdd.has(newStatsKey) // Skip if this combination of stats has been found
                     ) {
                         const newMelds: MeldableMateriaSlot[] = this.cloneMelds(existingCombination.item.melds);
